@@ -1,0 +1,14 @@
+[project]
+name = "living-replay"
+version = "0.1.0"
+description = "Harness-first terminal computation timeline"
+requires-python = ">=3.11"
+
+[project.optional-dependencies]
+test = ["pyte>=0.8"]
+solver = ["z3-solver"]
+crypto = ["cryptography"]
+gui = ["python-xlib"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
