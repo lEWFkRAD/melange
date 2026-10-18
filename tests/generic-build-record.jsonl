@@ -1,0 +1,30 @@
+{"ts": 1792347064.9405046, "actor": "shell", "action": "session_start", "payload": {"program": "shell session (git + unittest)", "repo": "melange-wt-m10"}, "state": {"cwd": "/home/hatch/workspace/melange-wt-m10", "branch": null, "commands_run": 0, "last_exit": null, "tests_run": 0, "tests_failed": 0, "tests_errored": 0, "worktree_dirty_files": null}}
+{"ts": 1792347064.9405084, "actor": "shell", "action": "command", "payload": {"argv": ["git", "rev-parse", "--abbrev-ref", "HEAD"]}}
+{"ts": 1792347064.9766688, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "m10-generality"}}
+{"ts": 1792347064.9824858, "actor": "shell", "action": "exit", "payload": {"argv": ["git", "rev-parse", "--abbrev-ref", "HEAD"], "code": 0}, "state": {"cwd": "/home/hatch/workspace/melange-wt-m10", "branch": "m10-generality", "commands_run": 1, "last_exit": 0, "tests_run": 0, "tests_failed": 0, "tests_errored": 0, "worktree_dirty_files": null}}
+{"ts": 1792347064.9824913, "actor": "shell", "action": "command", "payload": {"argv": ["git", "log", "--oneline", "-3"]}}
+{"ts": 1792347064.9888585, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "3003858 M4 slice 1: bridge-issued clamp on session recordings"}}
+{"ts": 1792347064.994525, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "7424778 M3: bridge as a live service + served reference surface"}}
+{"ts": 1792347064.999651, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "bad8ed2 Smalls: M2 replay_events prefix fix, M6 export provenance, M7 house rules"}}
+{"ts": 1792347065.000645, "actor": "shell", "action": "exit", "payload": {"argv": ["git", "log", "--oneline", "-3"], "code": 0}, "state": {"cwd": "/home/hatch/workspace/melange-wt-m10", "branch": "m10-generality", "commands_run": 2, "last_exit": 0, "tests_run": 0, "tests_failed": 0, "tests_errored": 0, "worktree_dirty_files": null}}
+{"ts": 1792347065.0006485, "actor": "shell", "action": "command", "payload": {"argv": ["git", "status", "--porcelain"]}}
+{"ts": 1792347065.0264802, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": " M src/living_replay/ingest.py"}}
+{"ts": 1792347065.0264924, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "?? tests/generic-build-record.jsonl"}}
+{"ts": 1792347065.0264952, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "?? tools/make_generic_fixture.py"}}
+{"ts": 1792347065.0275714, "actor": "shell", "action": "exit", "payload": {"argv": ["git", "status", "--porcelain"], "code": 0}, "state": {"cwd": "/home/hatch/workspace/melange-wt-m10", "branch": "m10-generality", "commands_run": 3, "last_exit": 0, "tests_run": 0, "tests_failed": 0, "tests_errored": 0, "worktree_dirty_files": 3}}
+{"ts": 1792347065.027575, "actor": "shell", "action": "command", "payload": {"argv": ["/usr/bin/python3", "-m", "unittest", "-v", "tests.test_ingest", "tests.test_house_rules"]}}
+{"ts": 1792347065.2362893, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "test_counts (tests.test_ingest.TestDesktopIngest.test_counts) ... ok"}}
+{"ts": 1792347065.2632108, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "test_fidelity_label (tests.test_ingest.TestDesktopIngest.test_fidelity_label) ... ok"}}
+{"ts": 1792347065.3502238, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "test_reconstruction_matches_recorders_final (tests.test_ingest.TestDesktopIngest.test_reconstruction_matches_recorders_final) ... ok"}}
+{"ts": 1792347065.3774872, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "test_structure_refusals (tests.test_ingest.TestDesktopIngest.test_structure_refusals) ... ok"}}
+{"ts": 1792347065.5981445, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "test_live_reconstruction_exact (tests.test_ingest.TestLiveDesktopIngest.test_live_reconstruction_exact) ... ok"}}
+{"ts": 1792347065.5989676, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "test_set_and_del_apply (tests.test_ingest.TestNonZeroDelta.test_set_and_del_apply) ... ok"}}
+{"ts": 1792347065.60201, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "test_frames_round_trip_and_refusals (tests.test_ingest.TestScreenOnly.test_frames_round_trip_and_refusals) ... ok"}}
+{"ts": 1792347066.093958, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "test_pins_hold_and_gate_forks (tests.test_house_rules.HouseRulesWorkbookTest.test_pins_hold_and_gate_forks) ... ok"}}
+{"ts": 1792347066.0939858, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": ""}}
+{"ts": 1792347066.093989, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "----------------------------------------------------------------------"}}
+{"ts": 1792347066.0940034, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "Ran 8 tests in 0.893s"}}
+{"ts": 1792347066.0940053, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": ""}}
+{"ts": 1792347066.0940065, "actor": "shell", "action": "output", "payload": {"stream": "stdout", "text": "OK"}}
+{"ts": 1792347066.1576266, "actor": "shell", "action": "exit", "payload": {"argv": ["/usr/bin/python3", "-m", "unittest", "-v", "tests.test_ingest", "tests.test_house_rules"], "code": 0}, "state": {"cwd": "/home/hatch/workspace/melange-wt-m10", "branch": "m10-generality", "commands_run": 4, "last_exit": 0, "tests_run": 8, "tests_failed": 0, "tests_errored": 0, "worktree_dirty_files": 3}}
+{"ts": 1792347066.1576333, "actor": "shell", "action": "session_end", "payload": {"commands": 4, "tests_run": 8}, "state": {"cwd": "/home/hatch/workspace/melange-wt-m10", "branch": "m10-generality", "commands_run": 4, "last_exit": 0, "tests_run": 8, "tests_failed": 0, "tests_errored": 0, "worktree_dirty_files": 3}}

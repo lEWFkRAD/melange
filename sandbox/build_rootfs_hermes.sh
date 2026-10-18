@@ -55,6 +55,7 @@ cp "$REPO_SRC/sandbox/model_shim.py" "$SB/rootfs/opt/model_shim.py"
 cp "$REPO_SRC/sandbox/guest_init.sh" "$SB/rootfs/init" 2>/dev/null || true
 cp "$REPO_SRC/sandbox/hermes_agent.py" "$SB/rootfs/opt/hermes_agent.py"
 cp "$REPO_SRC/sandbox/live_agent.py" "$SB/rootfs/opt/live_agent.py"
+cp "$REPO_SRC/sandbox/live_resume_agent.py" "$SB/rootfs/opt/live_resume_agent.py"
 
 rm -f "$SB/rootfs-hermes.ext4"
 truncate -s 1200M "$SB/rootfs-hermes.ext4"

@@ -54,7 +54,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent))          # workbook_eval
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from living_replay import bridge, house_rules, ingest  # noqa: E402
+from living_replay import bridge, house_rules, ingest, shelf  # noqa: E402
 from living_replay.ingest import FidelityError  # noqa: E402
 from living_replay.store import TimelineStore  # noqa: E402
 
@@ -91,7 +91,22 @@ class StoreRegistry:
                 from living_replay import flagship
                 flagship.run_flagship(root.parent)
             self._generated.add(sid)
-        return TimelineStore(root)
+        # Encrypted stores carry a wrapped key (key.json): open them the
+        # same way the TUI does — master key from LIVING_REPLAY_KEY, else
+        # a master.b64 inside or beside the store tree.
+        provider = None
+        rootp = Path(root).expanduser()
+        if (rootp / "key.json").exists():
+            import os
+            from living_replay.crypto import LocalKeyProvider
+            if os.environ.get("LIVING_REPLAY_KEY"):
+                provider = LocalKeyProvider.from_env()
+            else:
+                for cand in (rootp / "master.b64", rootp.parent / "master.b64"):
+                    if cand.exists():
+                        provider = LocalKeyProvider.from_file(cand)
+                        break
+        return TimelineStore(root, key_provider=provider)
 
 
 REGISTRY: StoreRegistry | None = None
@@ -206,7 +221,110 @@ def branch_detail(store, branch: str, entry: dict) -> dict:
         "fork": fork,
         "house_rules": rules,
         "notes": bridge.notes(store, branch),
+        "computation": (bridge.computation(store, branch)
+                        if kind == "session" else None),
+        # M11: the shelf standing, how this version was made, and its
+        # spoken story (script + engine facts, never the audio bytes).
+        "kept": shelf.shelf_state(store, branch),
+        "provenance": shelf.provenance(store, branch),
+        "narration": shelf.narration(store, branch),
     }
+
+
+def pin_status(store, branch: str, entry: dict) -> str | None:
+    """The Golden Path standing of a branch, in one word for the
+    shelf: None (no rules), 'Holding', 'Broken', or 'Not checked'
+    (rules exist but this service cannot compute the branch's values
+    — said plainly rather than guessed). Workbook values and a
+    session branch's recorded computation are both computable here.
+    """
+    pins = house_rules.pins_on(store, branch)
+    if not pins:
+        return None
+    values = None
+    kind, _ = step_events(store, branch)
+    if kind == "workbook":
+        values = workbook_values(store, branch, entry)
+    elif kind == "session":
+        comp = bridge.computation(store, branch)
+        if comp is not None:
+            values = comp["figures"]
+    if values is None:
+        return "Not checked"
+    rules = house_rules.house_rules(store, branch, values)
+    if any(r["status"] == "Broken" for r in rules):
+        return "Broken"
+    return "Holding"
+
+
+def shelf_entry(store, branch: str, entry: dict) -> dict:
+    """One version's shelf card: the facts the shelf shows about it."""
+    fidelity = ingest.branch_fidelity(store, branch)
+    kind, steps = step_events(store, branch)
+    fork = None
+    for v in bridge.versions(store):
+        if v["name"] == branch:
+            fork = v["fork"]
+    if fork:
+        fork = dict(fork)
+        fork["split_step"] = split_step(store, fork)
+    narr = shelf.narration(store, branch)
+    return {
+        "name": branch,
+        "fidelity": fidelity,
+        "kind": kind,
+        "steps": len(steps),
+        "seal": bridge.seal(store, branch),
+        "fork": fork,
+        "pins": len(house_rules.pins_on(store, branch)),
+        "pin_status": pin_status(store, branch, entry),
+        "kept": shelf.shelf_state(store, branch),
+        "provenance": shelf.provenance(store, branch),
+        "narration": ({"has_audio": narr["has_audio"],
+                        "engine": narr["engine"]} if narr else None),
+    }
+
+
+def branch_map(store, sid: str) -> dict:
+    """The spatial map of one recording: a lane per version, a
+    positioned entry per step, built entirely from the store.
+
+    Markers, all read off real events: 'pin' (this step IS a house
+    rule being pinned), 'note' (a Note is pinned to this step),
+    'checkpoint' (another version split from this step), 'split'
+    (this step is where this version left its parent).
+    """
+    versions = bridge.versions(store)
+    checkpoints = {v["fork"]["checkpoint"] for v in versions if v["fork"]}
+    lanes = []
+    for v in versions:
+        name = v["name"]
+        kind, steps = step_events(store, name)
+        note_targets = {n["at_event"] for n in bridge.notes(store, name)}
+        fork = v["fork"]
+        lane_steps = []
+        for i, ev in enumerate(steps, start=1):
+            markers = []
+            if ev["id"] in checkpoints:
+                markers.append("checkpoint")
+            if ev["id"] in note_targets:
+                markers.append("note")
+            if ev["kind"] == "edit" \
+                    and (ev["payload"] or {}).get("edit_kind") == "pin":
+                markers.append("pin")
+            if fork and ev["kind"] == "fork":
+                markers.append("split")
+            lane_steps.append({"n": i, "event_id": ev["id"],
+                               "kind": ev["kind"], "markers": markers})
+        lanes.append({
+            "branch": name, "kind": kind, "fidelity": v["fidelity"],
+            "original": fork is None,
+            "parent_branch": fork["parent_branch"] if fork else None,
+            "split_step": split_step(store, fork) if fork else None,
+            "kept": shelf.shelf_state(store, name),
+            "steps": lane_steps,
+        })
+    return {"store": sid, "lanes": lanes}
 
 
 def sniff_image(data: bytes) -> str:
@@ -288,6 +406,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True, "stores": len(REGISTRY.ids())})
         if parts == ["api", "stores"]:
             return self._stores()
+        if parts == ["api", "shelf"]:
+            return self._shelf()
         if len(parts) >= 4 and parts[0] == "api" and parts[1] == "store" \
                 and parts[3] == "branch":
             sid, branch = parts[2], parts[4] if len(parts) > 4 else None
@@ -299,6 +419,11 @@ class Handler(BaseHTTPRequestHandler):
                 if len(parts) == 5:
                     return self._json(200, {"id": sid, "label": entry.get("label", sid),
                                             **branch_detail(store, branch, entry)})
+                if len(parts) == 6 and parts[5] == "map":
+                    return self._json(200, branch_map(store, sid))
+                if len(parts) == 7 and parts[5] == "narration" \
+                        and parts[6] == "audio":
+                    return self._narration_audio(store, branch)
                 if len(parts) == 7 and parts[5] == "step":
                     return self._step(store, branch, int(parts[6]), query, entry)
                 if len(parts) == 7 and parts[5] == "wherefrom":
@@ -309,7 +434,9 @@ class Handler(BaseHTTPRequestHandler):
     def _route_post(self):
         parts, _ = self._parts()
         if len(parts) == 6 and parts[0] == "api" and parts[1] == "store" \
-                and parts[3] == "branch" and parts[5] in ("note", "fork"):
+                and parts[3] == "branch" \
+                and parts[5] in ("note", "fork", "explain", "promote",
+                                 "demote", "narration"):
             sid, branch = parts[2], parts[4]
             entry = self._entry(sid)
             body = self._body_json()
@@ -317,6 +444,14 @@ class Handler(BaseHTTPRequestHandler):
                 store = REGISTRY.open(sid)
                 if parts[5] == "note":
                     return self._note(store, branch, body)
+                if parts[5] == "explain":
+                    return self._explain(store, branch, body)
+                if parts[5] == "promote":
+                    return self._promote(store, branch, body)
+                if parts[5] == "demote":
+                    return self._demote(store, branch)
+                if parts[5] == "narration":
+                    return self._make_narration(store, branch)
                 return self._fork(store, branch, body, entry)
         raise KeyError(parsed_path(parts))
 
@@ -347,6 +482,50 @@ class Handler(BaseHTTPRequestHandler):
             out.append({"id": sid, "label": entry.get("label", sid),
                         "branches": branches})
         return self._json(200, out)
+
+    def _shelf(self):
+        """The shelf as a place (M11): every recording in the
+        registry with every version on it — kind badge facts, branch
+        count, Golden Path standing, seal, and which What-ifs are
+        kept, under what name, and how they were made."""
+        out = []
+        for sid in REGISTRY.ids():
+            entry = REGISTRY.entries[sid]
+            with REGISTRY.lock(sid):
+                store = REGISTRY.open(sid)
+                branches = [shelf_entry(store, v["name"], entry)
+                            for v in bridge.versions(store)]
+            out.append({"id": sid, "label": entry.get("label", sid),
+                        "branch_count": len(branches),
+                        "branches": branches})
+        return self._json(200, out)
+
+    def _promote(self, store, branch, body):
+        state = shelf.promote(store, branch, body.get("name", ""))
+        return self._json(201, {"branch": branch, **state})
+
+    def _demote(self, store, branch):
+        state = shelf.demote(store, branch)
+        return self._json(200, {"branch": branch, **state})
+
+    def _make_narration(self, store, branch):
+        made = shelf.make_narration(store, branch)
+        return self._json(201, made)
+
+    def _narration_audio(self, store, branch):
+        audio = shelf.narration_audio(store, branch)
+        if audio is None:
+            narr = shelf.narration(store, branch)
+            if narr is None:
+                raise KeyError("narration")
+            if narr["engine"]:
+                msg = "this version's story has no audio attached"
+            else:
+                msg = ("this version's story is words only here: "
+                       + shelf.NO_ENGINE_NOTE)
+            return self._error(404, msg)
+        return self._send(200, audio, "audio/wav",
+                          {"X-Melange-Narration": "flite-wav"})
 
     def _step(self, store, branch, n, query, entry):
         kind, steps = step_events(store, branch)
@@ -485,6 +664,24 @@ class Handler(BaseHTTPRequestHandler):
             "reused": result["reused"],
             "pins_inherited": result["pins_inherited"],
             "violations": result["violations"]})
+
+    def _explain(self, store, branch, body):
+        """What went wrong? (M4): solve backward from a figure of a
+        session recording's computation to the single recorded-input
+        changes that would have produced the desired value. Every
+        candidate the bridge returns was forward-executed through
+        the same Engine path clamp uses; the bridge presents them
+        all and never chooses. Pin-blocked candidates come back
+        named inside a normal 200 — the explanation succeeded; some
+        of its answers are rules-blocked. Fidelity refusals stay
+        403 and honest non-computations 400 via the handler."""
+        target = body.get("target")
+        if not target:
+            raise ValueError("an explain needs a target figure")
+        if body.get("desired") is None:
+            raise ValueError("an explain needs the value it should be")
+        result = bridge.explain(store, branch, target, body["desired"])
+        return self._json(200, result)
 
     @staticmethod
     def _fresh_name(existing: set, base: str) -> str:

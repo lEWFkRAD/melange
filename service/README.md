@@ -7,6 +7,15 @@ surface (`static/index.html`) at `/`. It replaces the baked players:
 the surface holds **no recording data** — everything it shows was
 fetched from this service, from the stores on disk, at request time.
 
+M11 adds the rest of the volume doctrine to the same pattern: the
+surface lands on **the shelf** (every recording, its versions, their
+seals and Golden Path standings, and the kept What-ifs with their
+provenance), each open recording carries a **spatial map** of its
+lanes and steps that dives on click, and a version can **tell its
+story** — a narration composed from the record, spoken by the
+machine's speech engine where one exists and attached to the branch
+in the store. The library side is `living_replay/shelf.py`.
+
 Fidelity is enforced server-side by the library's own gates
 (`living_replay.ingest.require_branch_op` via the bridge): a refused
 operation returns **403** with the library's refusal sentence. The
@@ -72,6 +81,13 @@ structure/session → one per event in the branch's replay.
 | `POST /api/store/<id>/branch/<b>/note` `{step, text}` | 201 `{event_id, notes}` — a real `annotation` event written into the store via the bridge |
 | `POST /api/store/<id>/branch/<b>/fork` `{step?, note?, branch?}` | 201 — bridge `try_differently`: a real What-if branch + context note. 403 with the refusal sentence where fidelity refuses forks |
 | `POST .../fork` `{clamp: {cell, value}}` (workbook branches) | `house_rules.checked_fork`: pins pre-checked against the recomputed values; 201 `{accepted, branch, values, pins_inherited}` or **422** `{accepted: false, violations, reason}` with the broken rules named |
+| `GET /api/shelf` | The shelf as a place (M11): `[{id, label, branch_count, branches: [{name, fidelity, kind, steps, seal, fork, pins, pin_status, kept, provenance, narration}]}]` — `pin_status` is `Holding`/`Broken` where the branch's values are computable in this service, `Not checked` where they are not, and null where the branch carries no house rules |
+| `GET /api/store/<id>/branch/<b>` | also carries `kept` (shelf standing), `provenance` (how this version was made) and `narration` (latest story: script, engine, has_audio) |
+| `GET /api/store/<id>/branch/<b>/map` | The spatial map: `{store, lanes: [{branch, kind, fidelity, original, parent_branch, split_step, kept, steps: [{n, event_id, kind, markers}]}]}` — markers (`pin`, `note`, `checkpoint`, `split`) read off real events |
+| `POST /api/store/<id>/branch/<b>/promote` `{name}` | Keep a What-if on the shelf under a name (201). A `shelf` event on the What-if branch only — the Original is never touched, and the standing survives restarts because it lives in the store. 400 for the Original itself, a blank name, or a name already on the shelf |
+| `POST /api/store/<id>/branch/<b>/demote` | Take a kept What-if back off the shelf (200); the branch and its record stay |
+| `POST /api/store/<id>/branch/<b>/narration` | Compose the version's story from its record and speak it where a speech engine exists (ffmpeg's flite filter): the audio is attached to the branch as a store blob and a `narration` event records script + engine. 201 `{script, engine, has_audio, audio_note}` — with no engine, `has_audio` is false and `audio_note` says the story is words only |
+| `GET /api/store/<id>/branch/<b>/narration/audio` | The spoken story (WAV), or 404 saying plainly that this version's story is words only here |
 
 Errors: 400 bad input, 403 fidelity refusal, 404 unknown
 store/branch/step, 422 house-rule rejection, 500 anything else (with

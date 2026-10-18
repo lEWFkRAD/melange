@@ -16,8 +16,22 @@ mount -t ext4 /dev/vdb /data || echo "LR-ERROR data drive mount failed"
 # with a connection error while vsock (which needs no interface) kept
 # working. Bring lo up before any agent starts.
 /bin/ip link set lo up 2>/dev/null || /bin/ifconfig lo up
+# Entropy: these guests have no working hardware RNG path (Firecracker's
+# entropy device does not surface in this kernel, verified 2026-10-16),
+# and a fresh boot can stall indefinitely at the agent's first blocking
+# getrandom while the kernel CRNG waits on interrupt jitter (three
+# stalled boots, serial ending at the python urandom read, vs healthy
+# boots initializing CRNG at ~170s). The host writes fresh random bytes
+# to /data/seed.bin; credit them to the pool here so CRNG initializes
+# before any agent starts.
+if [ -f /data/seed.bin ]; then
+  /usr/local/bin/python3 -c "import fcntl,struct; s=open('/data/seed.bin','rb').read(); f=open('/dev/urandom','wb',buffering=0); fcntl.ioctl(f,0x40085203,struct.pack('ii',len(s)*8,len(s))+s); f.close()" 2>/dev/null || echo "LR-WARN entropy seed failed"
+fi
 export PYTHONDONTWRITEBYTECODE=1
 export HOME=/root
+if [ -f /data/RUN_RESUME ]; then
+  exec /usr/local/bin/python3 /opt/live_resume_agent.py
+fi
 if [ -f /data/RUN_LIVE ]; then
   exec /usr/local/bin/python3 /opt/live_agent.py
 fi
