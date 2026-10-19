@@ -1,7 +1,7 @@
 from __future__ import annotations
-import fcntl, os, pty, select, struct, subprocess, termios, time
+import fcntl, os, pty, select, signal, struct, subprocess, termios, time
 from .grid import Grid
-from .redaction import redact_bytes
+from .redaction import redact_bytes, split_redaction_buffer
 from .store import TimelineStore
 
 class PtyCapture:
@@ -15,34 +15,43 @@ class PtyCapture:
         if eid % self.every == 0:
             self.store.append(self.branch,"grid_keyframe",{"blob":self.store.put_blob(self.grid.snapshot()),"through":eid})
         return eid
-    # Bytes withheld at the tail of a live stream so a secret split across
-    # two PTY reads is still whole when redaction sees it. Longer than any
-    # redaction pattern's realistic match.
-    TAIL = 64
     def run(self, argv: list[str], timeout=10.0, tool_event: int | None=None) -> int:
         master, slave=pty.openpty()
         # Real TUIs query the window size; a 0x0 PTY makes them fail or guess.
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", self.grid.rows, self.grid.cols, 0, 0))
-        proc=subprocess.Popen(argv,stdin=slave,stdout=slave,stderr=slave,close_fds=True); os.close(slave)
+        try:
+            proc=subprocess.Popen(argv,stdin=slave,stdout=slave,stderr=slave,close_fds=True,
+                                  start_new_session=True)
+        except BaseException:
+            os.close(master)
+            raise
+        finally:
+            os.close(slave)
+        os.set_blocking(master, False)
         end=time.monotonic()+timeout; pending=b""
         def push(data: bytes, final: bool=False):
             nonlocal pending
             pending += data
-            if final or len(pending) > self.TAIL:
-                emit, pending = (pending, b"") if final else (pending[:-self.TAIL], pending[-self.TAIL:])
-                if emit: self.record_bytes(emit, tool_event)
+            emit, pending = split_redaction_buffer(pending, final=final)
+            if emit: self.record_bytes(emit, tool_event)
         try:
-            while time.monotonic()<end and (proc.poll() is None):
-                ready,_,_=select.select([master],[],[],.05)
+            while True:
+                remaining = end - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(argv, timeout)
+                ready,_,_=select.select([master],[],[],min(.05, remaining))
                 if ready:
                     try: data=os.read(master,8192)
+                    except BlockingIOError: continue
                     except OSError: break
-                    if data: push(data)
-            while True:
-                try: data=os.read(master,8192)
-                except OSError: break
-                if not data: break
-                push(data)
-        finally: os.close(master)
-        push(b"", final=True)
-        return proc.wait(timeout=1)
+                    if not data: break
+                    push(data)
+            return proc.wait(timeout=max(0, end-time.monotonic()))
+        except BaseException:
+            try: os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError: pass
+            proc.wait()
+            raise
+        finally:
+            os.close(master)
+            push(b"", final=True)

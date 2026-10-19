@@ -179,6 +179,16 @@ def _recorded_computation(store, branch: str):
             "this recording's inputs cannot be rebuilt from its record")
     graph = flagship.build_fact_graph(intake_text)
     inputs = {p: f.value for p, f in graph.facts.items() if f.formula is None}
+    # Rebuild the selected computation's effective inputs, including
+    # edits inherited from earlier What-ifs. Starting from the original
+    # intake alone silently resets every previous correction on a fork.
+    for ev in events:
+        if ev["id"] > comp["id"]:
+            break
+        payload = ev["payload"] or {}
+        if (ev["kind"] == "edit" and payload.get("edit_kind") == "clamp"
+                and payload.get("target") in inputs):
+            inputs[payload["target"]] = payload["value"]
     return comp, graph, inputs
 
 

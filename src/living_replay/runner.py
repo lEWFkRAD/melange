@@ -14,6 +14,7 @@ from typing import Any, Callable
 from .capture import PtyCapture
 from .forking import restore_workspace
 from .replay import reconstruct
+from .redaction import redact_text
 from .store import TimelineStore
 
 CONTEXT_KINDS = ("tool_call", "model_call", "context_note")
@@ -48,14 +49,15 @@ class ForkContext:
     def call_tool(self, name: str, output: bytes, tool_input: str = "") -> int:
         """Record one tool call and its terminal output on this branch."""
         event = self.store.append(self.branch, "tool_call",
-                                  {"name": name, "input": tool_input, "output": output.decode("utf-8", "replace")})
+                                  {"name": redact_text(name), "input": redact_text(tool_input),
+                                   "output": redact_text(output.decode("utf-8", "replace"))})
         self.capture.record_bytes(output, event)
         return event
 
     def call_model(self, prompt: str, tokens: str) -> int:
         """Record a model decision (the recorded tokens ARE the replay)."""
         return self.store.append(self.branch, "model_call",
-                                 {"prompt": prompt, "tokens": tokens, "replayed": True})
+                                 {"prompt": redact_text(prompt), "tokens": redact_text(tokens), "replayed": True})
 
 def run_fork(store: TimelineStore, parent_branch: str, checkpoint: int, new_branch: str,
              task: Callable[[ForkContext], Any], *, note: str | None = None,
@@ -70,7 +72,7 @@ def run_fork(store: TimelineStore, parent_branch: str, checkpoint: int, new_bran
     """
     fork_event = store.fork(parent_branch, checkpoint, new_branch)
     if note is not None:
-        store.append(new_branch, "context_note", {"text": note, "pinned": True}, parent_event=fork_event)
+        store.append(new_branch, "context_note", {"text": redact_text(note), "pinned": True}, parent_event=fork_event)
     workspace = None
     if workspace_snapshot is not None:
         if workspace_dest is None:
