@@ -6,6 +6,8 @@ const stepNames = {tool_call:'Work was done', model_call:'Figures were calculate
 const titles = {steps:'Steps', inspect:'Look inside', note:'Note', change:'Change this step', instruction:'Try it differently'};
 const labels = {wages:'Wages', withholding:'Federal withholding', otherIncome:'Other income', standardDeduction:'Standard deduction', stateWages:'State wages', stateWithholding:'State withholding', dependents:'Dependents', agi:'Adjusted gross income', taxableIncome:'Taxable income', totalTax:'Total tax', refund:'Refund', taxBeforeCredits:'Tax before credits', childCredit:'Child credit', credit:'Credit', stateTaxable:'State taxable income', stateTax:'State tax', stateRefund:'State refund'};
 const state = {stores:[], id:null, branch:null, detail:null, step:0, payload:null, cache:new Map(), generation:0, request:0, playing:false, timer:null, panel:null, loading:false, saving:false, speed:1};
+Object.assign(labels,{retryBudget:'Retry budget',testsPassed:'Passed',testsFailed:'Failed',testsRun:'Tests run'});
+function isCoding() { return state.detail?.computation?.profile==='coding-retry-v1'; }
 function label(key) { const name = key.split('/').pop(); return labels[name] || name.replace(/_/g,' ').replace(/([a-z])([A-Z])/g,'$1 $2').replace(/^./,c=>c.toUpperCase()); }
 function number(value) { return typeof value === 'number' ? value.toLocaleString(undefined,{maximumFractionDigits:2}) : String(value ?? '—'); }
 function url(suffix='') { return '/api/store/'+encodeURIComponent(state.id)+'/branch/'+encodeURIComponent(state.branch)+suffix; }
@@ -133,7 +135,7 @@ async function go(step, internal=false) {
     history.replaceState(null,'','#'+new URLSearchParams({recording:state.id,version:state.branch,step:String(n)}));
     $('#hint').textContent='Space to play or pause · Arrow keys to step';
     if(d.computation_step&&n!==d.computation_step) {
-      const button=document.createElement('button'); button.textContent='Go to calculation'; button.onclick=()=>{stop();go(d.computation_step);};
+      const button=document.createElement('button'); button.textContent=isCoding()?'Go to test run':'Go to calculation'; button.onclick=()=>{stop();go(d.computation_step);};
       $('#hint').append(' · ',button);
     }
     return true;
@@ -150,6 +152,7 @@ function bindValues() {
 }
 function renderFrame(p, endpoint) {
   const d=state.detail, frame=$('#frame'), event=p.payload||{};
+  frame.classList.toggle('code-run',event.profile==='coding-retry-v1');
   $('#step-title').textContent=stepNames[p.event_kind]||(d.kind==='workbook'?'The workbook at this step':'The screen at this step');
   $('#screen-label').textContent=d.kind==='video'?'Recorded picture':d.kind==='structure'?'Recorded screen outline':'Re-drawn from the recording';
   if(d.kind==='video') {
@@ -158,6 +161,15 @@ function renderFrame(p, endpoint) {
   }
   if(d.kind==='structure') { frame.innerHTML=outline(p.parts);return; }
   if(d.kind==='workbook') { frame.innerHTML='<h3>'+esc(p.label||'Recorded workbook')+'</h3>'+valueTable(p.values);return; }
+  if(event.profile==='coding-retry-v1' && event.figures && event.execution) {
+    const f=event.figures, run=event.execution, failed=f['/testsFailed'];
+    $('#step-title').textContent=(event.clamped?'Tests rerun':'Recorded test run')+' · '+(failed?failed+' failing':'all '+f['/testsRun']+' pass');
+    $('#screen-label').textContent='Python · actual process output';
+    const editable=state.step===d.computation_step && !locked('change');
+    const cases=String(run.output||'').split('\n').filter(line=>/^test_\d+_/.test(line));
+    frame.innerHTML='<div class="figure-grid test-summary">'+['/testsPassed','/testsFailed','/testsRun'].map(key=>'<div class="figure '+(key==='/testsPassed'?'pass':key==='/testsFailed'?(failed?'fail':'clear'):'')+'"><span>'+esc(label(key))+'</span><strong>'+esc(number(f[key]))+'</strong></div>').join('')+'</div><div class="run-input"><span>Retry budget</span>'+(editable?'<button class="value-edit" data-edit="/retryBudget" aria-label="Change Retry budget">'+esc(event.inputs?.['/retryBudget'])+'</button>':'<strong>'+esc(event.inputs?.['/retryBudget'])+'</strong>')+'</div><pre class="test-output">'+cases.map(line=>'<span class="'+(/ERROR|FAIL/.test(line)?'failed':'')+'">'+esc(line.replace(/ \(__main__.*?\)/,''))+'</span>').join('\n')+'</pre><div class="run-footer"><span>Exit code '+esc(run.exit_code)+'</span><span>Synthetic coding task · real test execution</span></div><details class="code-evidence"><summary>View code · retry.py</summary><pre class="source-code">'+esc(run.source)+'</pre></details><details class="code-evidence"><summary>Full test output</summary><pre class="test-output">'+esc(run.output)+'</pre></details>';
+    bindValues();return;
+  }
   if(event.figures) {
     const figures=event.figures;
     const featured=['/totalTax','/refund','/agi'].filter(key=>key in figures);
@@ -166,7 +178,7 @@ function renderFrame(p, endpoint) {
     else frame.innerHTML+=valueTable(figures);
     bindValues();return;
   }
-  if(p.event_kind==='tool_call' && event.output) { frame.innerHTML='<h3>Recorded work</h3><pre class="document">'+esc(typeof event.output==='string'?event.output:JSON.stringify(event.output,null,2))+'</pre>';return; }
+  if(p.event_kind==='tool_call' && event.output) { frame.innerHTML='<h3>'+esc(event.name||'Recorded work')+'</h3><pre class="document">'+esc(typeof event.output==='string'?event.output:JSON.stringify(event.output,null,2))+'</pre>';return; }
   if(p.event_kind==='context_note') {frame.innerHTML='<h3>Instruction saved</h3><p class="frame-note">'+esc(event.text||'')+'</p><p class="muted">This records an instruction. It has not been run by this player.</p>';return;}
   if(p.event_kind==='annotation') {frame.innerHTML='<h3>Note</h3><p class="frame-note">'+esc(event.text||'')+'</p>';return;}
   if(p.screen?.trim()) {frame.innerHTML='<pre class="transcript">'+esc(p.screen.trimEnd())+'</pre>';return;}
@@ -225,8 +237,8 @@ function renderPanel() {
     $('#note-form').onsubmit=e=>{e.preventDefault();save(async()=>{await api(url('/note'),{step,text:$('#note-text').value.trim()});const detail=await api(url());state.detail=detail;renderMarkers();renderPanel();status('Note saved at step '+step+'.');});};return;
   }
   if(name==='change') {
-    if(state.step!==d.computation_step){box.innerHTML='<p>This version can rerun its recorded calculation. Go to that step to choose an input.</p><button id="to-calculation" class="primary">Go to calculation</button>';$('#to-calculation').onclick=()=>go(d.computation_step);return;}
-    box.innerHTML='<p>Like fixing a cell in a spreadsheet. The steps after it redo themselves. The original never changes.</p><form id="change-form"><label for="change-field">Input to change</label><select id="change-field">'+Object.keys(d.computation.inputs).map(key=>'<option value="'+esc(key)+'">'+esc(label(key))+'</option>').join('')+'</select><p id="current-value" class="note-tip"></p><label for="change-value">New value</label><input id="change-value" type="number" step="any" required><button class="primary" type="submit">Make the What-if</button><p id="form-error" class="panel-error" role="alert"></p></form>';
+    if(state.step!==d.computation_step){box.innerHTML='<p>Go to the recorded run to choose an input and try another outcome.</p><button id="to-calculation" class="primary">'+(isCoding()?'Go to test run':'Go to calculation')+'</button>';$('#to-calculation').onclick=()=>go(d.computation_step);return;}
+    box.innerHTML='<p>'+(isCoding()?'Change the retry budget and rerun the Python tests in a What-if. The Original stays unchanged.':'Change a recorded input and rerun its calculation in a What-if. The Original stays unchanged.')+'</p><form id="change-form"><label for="change-field">Input to change</label><select id="change-field">'+Object.keys(d.computation.inputs).map(key=>'<option value="'+esc(key)+'">'+esc(label(key))+'</option>').join('')+'</select><p id="current-value" class="note-tip"></p><label for="change-value">New value</label><input id="change-value" type="number" '+(isCoding()?'step="1" min="0" max="8"':'step="any"')+' required><button class="primary" type="submit">Make the What-if</button><p id="form-error" class="panel-error" role="alert"></p></form>';
     $('#change-field').onchange=()=>{const current=d.computation.inputs[$('#change-field').value];$('#current-value').textContent='Current value: '+number(current);$('#change-value').value=current;};$('#change-field').onchange();
     $('#change-form').onsubmit=e=>{e.preventDefault();const key=$('#change-field').value,value=Number($('#change-value').value),before=d.computation.inputs[key],storeId=state.id;if(!Number.isFinite(value))return;if(value===before){$('#form-error').textContent='Enter a different value to make a What-if.';return;}save(async()=>{const result=await api(url('/fork'),{clamp:{cell:key,value}});state.stores=await api('/api/stores');await openRecording(storeId,result.branch,Infinity,true);if(!state.payload)return;status(label(key)+' changed from '+number(before)+' to '+number(value)+'. The result below was recalculated.');const parent=d.branch;const back=document.createElement('button');back.textContent=d.fork?'Compare previous version':'Compare Original';back.onclick=()=>openRecording(storeId,parent,d.computation_step);$('#status').append(back);});};return;
   }

@@ -229,6 +229,9 @@ def computation(store, branch: str) -> dict | None:
     figures} rebuilt from the record, or None where the recording
     carries no re-executable computation."""
     try:
+        from . import coding_demo
+        if coding_demo.is_recording(store, branch):
+            return coding_demo.computation(store, branch)
         comp, _graph, inputs = _recorded_computation(store, branch)
     except ValueError:
         return None
@@ -255,8 +258,10 @@ def clamp(store, parent_branch: str, target: str, value,
     re-executable computation or the target is not a recorded input —
     an honest refusal, never a fabricated result.
     """
-    from . import flagship, house_rules
+    from . import coding_demo, flagship, house_rules
 
+    if coding_demo.is_recording(store, parent_branch):
+        return coding_demo.clamp(store, parent_branch, target, value, new_branch, instruction)
     ingest.require_branch_op(store, parent_branch, "clamp")
     comp, graph, inputs = _recorded_computation(store, parent_branch)
     if target not in inputs:

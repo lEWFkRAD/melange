@@ -61,8 +61,9 @@ first open if the timeline is absent. `profile_dir`/`fixture` locate
 the workbook profile used to evaluate clamp forks on workbook
 branches (needs openpyxl; loaded lazily, only for clamp requests).
 
-The default registry (`service/stores.json`) contains one synthetic return,
-generated under `service/stores/` on first open. It needs no external fixture
+The default registry (`service/stores.json`) contains a synthetic Python retry
+task (`generate: "coding-retry"`) and a synthetic return (`generate: "flagship"`),
+generated under `service/stores/` on first open. Neither needs external fixture
 files. Add your recording paths to a separate registry and set
 `MELANGE_STORES_FILE` to use them; workbook entries also need their profile
 and fixture. Paths from another machine are not included in the default.
@@ -107,6 +108,23 @@ when switching versions, plays at recorded pace (pauses bounded to 0.25–3
 seconds), and marks notes on the slider. The branch response includes a
 `timeline` of step numbers, event IDs, kinds and timestamps, plus the latest
 `computation_step`; neither requires downloading every frame first.
+
+The dark brass and cyan theme is in `static/dune.css`. It preserves the same
+controls, keyboard navigation, responsive inspector and reduced-motion setting.
+
+Try the coding task: **Go to test run → select Retry budget → enter 3 → Make the
+What-if**. The bundled Python client initially passes five tests and fails one
+because a request encounters three transient failures. Changing the budget
+from two retries to three reruns the actual six-test suite in a Python process;
+all six pass. **Compare Original** shows its unchanged five-pass/one-failure
+result. Both exact source and full process output are available in the player.
+
+This is a bounded coding demonstration, not arbitrary recorded-code execution.
+Only the bundled program executes; the input is an integer from 0 through 8,
+execution has a five-second timeout, and the recorded program digest must match
+the installed version. Recorded source is display evidence only. Seal checks
+and house-rule pins still govern changes. The saved `workspace/test_retry.py`
+can also be run directly from that workspace to reproduce the original failure.
 
 Try the synthetic example: **Go to calculation → select Wages → enter
 48000 → Make the What-if**. The new calculation opens immediately with tax

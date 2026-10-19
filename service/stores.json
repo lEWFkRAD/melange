@@ -1,1 +1,1 @@
-{"stores": {"flagship": {"generate": "flagship", "label": "Dana's return · synthetic example", "path": "service/stores/flagship/timeline"}}}
+{"stores":{"retry-lab":{"generate":"coding-retry","label":"Hermes delivery client · coding task","path":"service/stores/retry-lab/timeline"},"flagship":{"generate":"flagship","label":"Dana's return · synthetic example","path":"service/stores/flagship/timeline"}}}

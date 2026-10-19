@@ -86,10 +86,16 @@ class StoreRegistry:
     def open(self, sid: str) -> TimelineStore:
         entry = self.entries[sid]
         root = entry["path"]
-        if entry.get("generate") == "flagship" and sid not in self._generated:
+        generator = entry.get("generate")
+        if generator in {"flagship", "coding-retry"} and sid not in self._generated:
             if not (root / "timeline.sqlite").exists():
-                from living_replay import flagship
-                flagship.run_flagship(root.parent)
+                if generator == "coding-retry":
+                    from living_replay import coding_demo
+                    generated = coding_demo.run_demo(root.parent)
+                else:
+                    from living_replay import flagship
+                    generated = flagship.run_flagship(root.parent)
+                generated["store"].db.close()
             self._generated.add(sid)
         # Encrypted stores carry a wrapped key (key.json): open them the
         # same way the TUI does — master key from LIVING_REPLAY_KEY, else
