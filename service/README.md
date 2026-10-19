@@ -7,14 +7,10 @@ surface (`static/index.html`) at `/`. It replaces the baked players:
 the surface holds **no recording data** — everything it shows was
 fetched from this service, from the stores on disk, at request time.
 
-M11 adds the rest of the volume doctrine to the same pattern: the
-surface lands on **the shelf** (every recording, its versions, their
-seals and Golden Path standings, and the kept What-ifs with their
-provenance), each open recording carries a **spatial map** of its
-lanes and steps that dives on click, and a version can **tell its
-story** — a narration composed from the record, spoken by the
-machine's speech engine where one exists and attached to the branch
-in the store. The library side is `living_replay/shelf.py`.
+The default surface is a recording player with a picker, version selector,
+playback bar and optional details panel. **Advanced view** retains M11's
+shelf, spatial map, kept What-ifs and recorded narration. The library side
+of those features is `living_replay/shelf.py`.
 
 Fidelity is enforced server-side by the library's own gates
 (`living_replay.ingest.require_branch_op` via the bridge): a refused
@@ -29,7 +25,7 @@ from the repository root, then open http://localhost:8798. Pass `-Port 8799`
 to use another port. Keep the terminal open while using the player.
 
 ```sh
-service/run.sh            # binds 127.0.0.1:8798
+python3 service/melange_service.py  # binds 127.0.0.1:8798
 # or:
 MELANGE_PORT=9000 PYTHONPATH=src:service python3 service/melange_service.py
 ```
@@ -61,8 +57,9 @@ first open if the timeline is absent. `profile_dir`/`fixture` locate
 the workbook profile used to evaluate clamp forks on workbook
 branches (needs openpyxl; loaded lazily, only for clamp requests).
 
-The default registry (`service/stores.json`) contains one synthetic return,
-generated under `service/stores/` on first open. It needs no external fixture
+The default registry (`service/stores.json`) contains a synthetic Python retry
+task (`generate: "coding-retry"`) and a synthetic return (`generate: "flagship"`),
+generated under `service/stores/` on first open. Neither needs external fixture
 files. Add your recording paths to a separate registry and set
 `MELANGE_STORES_FILE` to use them; workbook entries also need their profile
 and fixture. Paths from another machine are not included in the default.
@@ -107,6 +104,23 @@ when switching versions, plays at recorded pace (pauses bounded to 0.25–3
 seconds), and marks notes on the slider. The branch response includes a
 `timeline` of step numbers, event IDs, kinds and timestamps, plus the latest
 `computation_step`; neither requires downloading every frame first.
+
+The dark brass and cyan theme is in `static/dune.css`. It preserves the same
+controls, keyboard navigation, responsive inspector and reduced-motion setting.
+
+Try the coding task: **Go to test run → select Retry budget → enter 3 → Make the
+What-if**. The bundled Python client initially passes five tests and fails one
+because a request encounters three transient failures. Changing the budget
+from two retries to three reruns the actual six-test suite in a Python process;
+all six pass. **Compare Original** shows its unchanged five-pass/one-failure
+result. Both exact source and full process output are available in the player.
+
+This is a bounded coding demonstration, not arbitrary recorded-code execution.
+Only the bundled program executes; the input is an integer from 0 through 8,
+execution has a five-second timeout, and the recorded program digest must match
+the installed version. Recorded source is display evidence only. Seal checks
+and house-rule pins still govern changes. The saved `workspace/test_retry.py`
+can also be run directly from that workspace to reproduce the original failure.
 
 Try the synthetic example: **Go to calculation → select Wages → enter
 48000 → Make the What-if**. The new calculation opens immediately with tax

@@ -43,7 +43,7 @@ The bridge also runs as a local service with encrypted timeline stores
 and a shelf UI:
 
 ```bash
-service/run.sh
+python3 service/melange_service.py
 ```
 
 It binds to 127.0.0.1:8798. The static surface in `surface-export/` is a
