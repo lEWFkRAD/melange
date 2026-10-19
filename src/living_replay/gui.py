@@ -91,10 +91,29 @@ class GuiSession:
         # After a driven input we wait for the app's next dump; an explicit
         # keyframe uses the latest dump as-is.
         dump = self._wait_dump() if fresh else (self._read_dump() or self._wait_dump())
+        return self._record_keyframe(dump, after_input)
+
+    def _record_keyframe(self, dump: dict, after_input: int | None) -> int:
         self._last_n = max(self._last_n, dump["n"])
         blob = self.screenshot_blob()
         return self.store.append(self.branch, "gui_keyframe",
                                  {"tree": dump["tree"], "screenshot": blob, "after_input": after_input})
+
+    def _wait_state(self, predicate, timeout: float = 15.0) -> dict:
+        """Poll the app's latest tree dump until predicate(dump) holds.
+
+        A driven input is only real once the app's own state shows it:
+        dumps lag inputs on a loaded machine, and an early dump can
+        predate the input it is supposed to frame. Waiting for the state
+        itself, not just a newer dump counter, is what keeps a keyframe
+        honest about the input that caused it."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            d = self._read_dump()
+            if d and predicate(d):
+                return d
+            time.sleep(0.05)
+        raise TimeoutError("GUI app state did not reach the expected state")
 
     def _focus_and_type(self, field_xy: tuple[int, int], text: str):
         from Xlib import X
@@ -137,21 +156,25 @@ class GuiSession:
         if shift_kc: xtest.fake_input(d, X.KeyRelease, shift_kc)
 
     def _clear_field(self, field_xy: tuple[int, int]):
+        """Empty an entry: triple-click selects its contents in Tk, then
+        BackSpace deletes the selection; an End + BackSpace sweep covers
+        builds where the selection binding differs."""
         from Xlib import X, XK
         from Xlib.ext import xtest
         d = self._x(); win = self._find_window(d)
         geom = win.get_geometry()
         x, y = geom.x + field_xy[0], geom.y + field_xy[1]
         xtest.fake_input(d, X.MotionNotify, x=x, y=y)
-        xtest.fake_input(d, X.ButtonPress, 1); xtest.fake_input(d, X.ButtonRelease, 1)
+        for _ in range(3):
+            xtest.fake_input(d, X.ButtonPress, 1); xtest.fake_input(d, X.ButtonRelease, 1)
+            time.sleep(0.03)
         d.sync(); time.sleep(0.1)
-        ctrl = d.keysym_to_keycode(XK.XK_Control_L)
-        a = d.keysym_to_keycode(XK.XK_a)
         bs = d.keysym_to_keycode(XK.XK_BackSpace)
-        xtest.fake_input(d, X.KeyPress, ctrl)
-        xtest.fake_input(d, X.KeyPress, a); xtest.fake_input(d, X.KeyRelease, a)
-        xtest.fake_input(d, X.KeyRelease, ctrl)
+        end = d.keysym_to_keycode(XK.XK_End)
         xtest.fake_input(d, X.KeyPress, bs); xtest.fake_input(d, X.KeyRelease, bs)
+        xtest.fake_input(d, X.KeyPress, end); xtest.fake_input(d, X.KeyRelease, end)
+        for _ in range(32):
+            xtest.fake_input(d, X.KeyPress, bs); xtest.fake_input(d, X.KeyRelease, bs)
         d.sync()
 
     def _tree_points(self, dump) -> dict:
@@ -188,6 +211,17 @@ class GuiSession:
         if dump: walk(dump["tree"])
         return values
 
+    def _result_text(self, dump) -> str:
+        """The form's result label: the Label that is neither field caption."""
+        texts: list[str] = []
+        def walk(node):
+            if node.get("class") == "Label": texts.append(node.get("text", ""))
+            for c in node.get("children", []): walk(c)
+        if dump: walk(dump["tree"])
+        for t in texts:
+            if t not in ("Payee", "Amount"): return t
+        return ""
+
     def _click(self, xy: tuple[int, int]):
         from Xlib import X
         from Xlib.ext import xtest
@@ -200,27 +234,46 @@ class GuiSession:
     # Widget geometry inside the 320x200 form (title bar excluded):
     PAYEE_FIELD = (160, 45); AMOUNT_FIELD = (160, 95); COMPUTE_BTN = (160, 130)
 
+    def _set_field_once(self, idx: int, text: str):
+        field = "payee" if idx == 0 else "amount"
+        self._clear_field(self._point_for(field))
+        if text: self._focus_and_type(self._point_for(field), text)
+
     def type_field(self, field: str, text: str) -> int:
         tool = self.store.append(self.branch, "tool_call",
                                  {"name": f"gui-type-{field}", "input": text, "output": ""})
         event = self.store.append(self.branch, "gui_input",
                                   {"action": "type", "field": field, "text": text, "tool": tool})
         idx = 0 if field == "payee" else 1
-        self._focus_and_type(self._point_for(field), text)
-        try:
-            self.keyframe(after_input=event, fresh=True)
-        except TimeoutError:
-            # The keystrokes either landed late (loaded machine) or missed
-            # the field (layout shifted under different fonts/metrics).
-            # Decide from the app's own tree: if the value is already right,
-            # keyframe from the latest dump; otherwise clear and retype once.
-            values = self._entry_values(self._read_dump())
-            if len(values) > idx and values[idx] == text:
-                self.keyframe(after_input=event)
-            else:
-                self._clear_field(self._point_for(field))
-                self._focus_and_type(self._point_for(field), text)
-                self.keyframe(after_input=event, fresh=True)
+        other = 1 - idx
+        base = self._entry_values(self._read_dump())
+        base_other = base[other] if len(base) > other else ""
+
+        def landed(dump) -> bool:
+            v = self._entry_values(dump)
+            return len(v) > idx and v[idx] == text and \
+                (len(v) <= other or v[other] == base_other)
+
+        # Drive, then verify against the app's own state before framing:
+        # on a loaded machine a click may not move focus and keystrokes
+        # land in the wrong entry, so an attempt that polluted the other
+        # field restores it and retries. Three attempts, then fail loudly
+        # rather than record a keyframe that misstates the input.
+        dump = None
+        for attempt in range(3):
+            vals = self._entry_values(self._read_dump())
+            if len(vals) > other and vals[other] != base_other:
+                self._set_field_once(other, base_other)
+            cur = self._entry_values(self._read_dump())
+            if not (len(cur) > idx and cur[idx] == text):
+                self._focus_and_type(self._point_for(field), text) \
+                    if attempt == 0 else self._set_field_once(idx, text)
+            try:
+                dump = self._wait_state(landed, timeout=6.0)
+                break
+            except TimeoutError:
+                if attempt == 2: raise
+        self._record_keyframe(dump, after_input=event)
         return event
 
     def click_compute(self) -> int:
@@ -228,15 +281,20 @@ class GuiSession:
                                  {"name": "gui-click-compute", "input": "Compute", "output": ""})
         event = self.store.append(self.branch, "gui_input",
                                   {"action": "click", "target": "Compute", "tool": tool})
-        self._click(self._point_for("compute"))
-        try:
-            self.keyframe(after_input=event, fresh=True)
-        except TimeoutError:
-            # A landed click always produces a dump (compute dumps), so a
-            # timeout means the click missed; re-aim from the freshest
-            # tree and click once more. Recomputing is idempotent.
+        # Click, then verify: the keyframe is recorded only from a dump
+        # whose result label shows the computation actually ran. A missed
+        # click produces no such dump, so re-aim and click again.
+        dump = None
+        for attempt in range(3):
             self._click(self._point_for("compute"))
-            self.keyframe(after_input=event, fresh=True)
+            try:
+                dump = self._wait_state(
+                    lambda d: self._result_text(d).startswith("total="),
+                    timeout=6.0)
+                break
+            except TimeoutError:
+                if attempt == 2: raise
+        self._record_keyframe(dump, after_input=event)
         return event
 
     def state(self) -> dict:
