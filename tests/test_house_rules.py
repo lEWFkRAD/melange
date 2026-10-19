@@ -21,6 +21,7 @@ Excel lane's artifacts; the test locates it under
 ~/workspace/your_files/melange-excel (override with MELANGE_EXCEL_DIR)
 and skips if the artifacts are absent.
 """
+import importlib.util
 import os
 import shutil
 import sys
@@ -33,9 +34,13 @@ EXCEL_DIR = Path(os.environ.get(
     Path.home() / "workspace" / "your_files" / "melange-excel"))
 BRANCH = "return-workbook"
 
+# The workbook profile needs openpyxl, which is a dependency of the Excel
+# lane's artifacts, not of this package; treat a missing openpyxl the same
+# as missing artifacts and skip.
 HAVE_ARTIFACTS = (EXCEL_DIR / "store").is_dir() and \
     (EXCEL_DIR / "workbook_profile.py").is_file() and \
-    (EXCEL_DIR / "melange-fixture.xlsx").is_file()
+    (EXCEL_DIR / "melange-fixture.xlsx").is_file() and \
+    importlib.util.find_spec("openpyxl") is not None
 
 if HAVE_ARTIFACTS:
     sys.path.insert(0, str(EXCEL_DIR))
