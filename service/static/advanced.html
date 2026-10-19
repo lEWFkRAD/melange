@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Melange - advanced view</title>
+<style>
+  :root { --bg:#12101f; --panel:#1b1830; --ink:#e8e6f2; --dim:#9a94b8;
+          --spice:#ffb347; --acc:#57c7b8; --bad:#e0655f; --line:#2c2750; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:15px/1.5 "Segoe UI", system-ui, sans-serif; }
+  header { display:flex; align-items:center; gap:14px; padding:12px 18px;
+           border-bottom:1px solid var(--line); }
+  header h1 { font-size:19px; margin:0; font-weight:600; }
+  header .sub { color:var(--dim); font-size:13px; }
+  .calm { margin-left:auto; color:var(--dim); font-size:13px; cursor:pointer; user-select:none; }
+  .calm input { accent-color:var(--spice); }
+  #unreachable { margin:26px 18px; padding:16px; border:1px solid var(--bad);
+                 border-radius:8px; color:#f0c4c1; background:#2a1622; }
+  #volume-wrap { padding:10px 18px 4px; border-bottom:1px solid var(--line); }
+  #vol-canvas { width:100%; height:190px; display:block; }
+  #vol-pov { color:var(--dim); font-size:13px; margin-top:2px; }
+  .vol-legend { border-top:1px solid #241f3a; margin-top:8px; padding-top:8px;
+                font-size:12.5px; color:#c9cede; }
+  .vol-legend b { color:var(--spice); font-weight:600; }
+  #vol-strands { display:flex; flex-wrap:wrap; gap:6px 18px; padding:8px 0 10px;
+                 font-size:12.5px; color:var(--dim); }
+  .dotp { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; }
+  nav#tabs { display:flex; gap:8px; padding:12px 18px 0; flex-wrap:wrap; }
+  nav#tabs button, #versions button { background:var(--panel); color:var(--ink);
+    border:1px solid var(--line); border-radius:16px; padding:5px 13px; cursor:pointer; font-size:13.5px; }
+  nav#tabs button.on, #versions button.on { border-color:var(--spice); color:var(--spice); }
+  #versions { display:flex; gap:8px; padding:10px 18px 0; flex-wrap:wrap; }
+  main { padding:12px 18px 30px; }
+  #bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  .chip { border:1px solid var(--line); border-radius:12px; padding:2px 10px; font-size:12.5px; color:var(--dim); }
+  .chip.seal-ok { color:#0e2a1e; background:#7fd79a; border-color:#7fd79a; font-weight:600; }
+  .chip.seal-bad { color:#fff; background:var(--bad); border-color:var(--bad); font-weight:600; }
+  #viewer { background:#000; border:1px solid var(--line); border-radius:8px;
+            min-height:200px; display:flex; align-items:center; justify-content:center; overflow:auto; }
+  #viewer img { max-width:100%; display:block; }
+  #viewer pre { margin:0; padding:14px; font:13px/1.45 Consolas, monospace; color:#d7f5d0;
+                width:100%; white-space:pre-wrap; }
+  #viewer table { border-collapse:collapse; margin:14px; font-size:14px; }
+  #viewer td, #viewer th { border:1px solid var(--line); padding:5px 12px; text-align:left; }
+  #viewer td.val { text-align:right; font-variant-numeric:tabular-nums; color:var(--spice); }
+  #caption { color:var(--dim); font-size:13.5px; margin:8px 2px 0; min-height:20px; }
+  #transport { display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+  #transport button { background:var(--panel); color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:6px 12px; cursor:pointer; font-size:14px; }
+  #transport button:disabled { opacity:.45; cursor:default; }
+  #scrub { flex:1; min-width:140px; accent-color:var(--spice); }
+  #readout { font-variant-numeric:tabular-nums; color:var(--ink); min-width:110px; }
+  .panels { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; margin-top:16px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+  .panel h3 { margin:0 0 8px; font-size:14px; color:var(--spice); font-weight:600; }
+  .panel p, .panel li { font-size:13.5px; color:var(--ink); }
+  .panel ul { margin:6px 0; padding-left:18px; }
+  .panel input[type=text], .panel input[type=number], .panel select, .panel textarea {
+    background:#12101f; color:var(--ink); border:1px solid var(--line); border-radius:5px;
+    padding:5px 8px; font-size:13.5px; width:100%; margin:4px 0; }
+  .panel button { background:#2c2750; color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13.5px; margin-top:6px; }
+  .panel button:disabled { opacity:.45; cursor:default; }
+  .refusal, #refusal { color:#f0c4c1; font-size:13.5px; margin-top:8px; white-space:pre-wrap; }
+  .ok-note { color:#7fd79a; font-size:13.5px; margin-top:8px; white-space:pre-wrap; }
+  .locked-why { color:var(--dim); font-size:12.5px; margin-top:6px; }
+  header button { background:var(--panel); color:var(--ink); border:1px solid var(--line);
+    border-radius:16px; padding:5px 13px; cursor:pointer; font-size:13.5px; }
+  #shelf-view { padding:14px 18px 4px; border-bottom:1px solid var(--line); }
+  #shelf-view h2 { margin:0 0 2px; font-size:17px; font-weight:600; }
+  #shelf-view .lede { color:var(--dim); font-size:13.5px; margin:0 0 12px; }
+  .shelf-card { background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:12px 14px; margin-bottom:12px; }
+  .shelf-card h3 { margin:0 0 2px; font-size:15px; color:var(--ink); font-weight:600; }
+  .shelf-card .meta { color:var(--dim); font-size:12.5px; margin-bottom:4px; }
+  .shelf-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    padding:7px 0; border-top:1px solid #241f3a; font-size:13.5px; }
+  .shelf-row .grow { flex:1; min-width:220px; }
+  .shelf-row button { background:#2c2750; color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:5px 12px; cursor:pointer; font-size:13px; }
+  .kept-name { color:var(--spice); font-weight:600; }
+  .prov { color:var(--dim); font-size:12.5px; display:block; }
+  #panel-map { grid-column:1 / -1; }
+  #map-box svg { width:100%; height:auto; display:block; }
+  #map-box .lane-label { fill:var(--dim); font-size:11px; }
+  audio.narr { width:100%; margin-top:8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Melange</h1>
+  <a href="/" style="color:var(--spice)">Back to player</a>
+  <span class="sub">Every recording below is read live from its store — nothing on this page was baked in.</span>
+  <label class="calm"><input type="checkbox" id="calm"> Calm the drift</label>
+  <button id="btn-shelf">The shelf</button>
+</header>
+
+<section id="shelf-view" hidden>
+  <h2>The shelf</h2>
+  <p class="lede">Every recording lives here. A What-if that was worth
+  keeping gets a name and a place on the shelf, next to its Original —
+  how it was made stays written on it. Nothing here was baked in: the
+  shelf is read from the stores when you look at it.</p>
+  <div id="shelf-cards"></div>
+</section>
+
+<div id="unreachable" hidden>
+  <b>Cannot reach the recordings service.</b><br>
+  This page keeps no copy of any recording — when the service is not
+  answering, there is honestly nothing to show. Start the service
+  (service/run.sh) and reload.
+</div>
+
+<section id="volume-wrap" hidden>
+  <canvas id="vol-canvas" width="1100" height="190"></canvas>
+  <div id="vol-pov"></div>
+  <div class="vol-legend" id="vol-legend"></div>
+  <div id="vol-strands"></div>
+</section>
+
+<nav id="tabs"></nav>
+<div id="versions"></div>
+
+<main id="surface" hidden>
+  <div id="bar">
+    <span class="chip" id="seal"></span>
+    <span class="chip" id="kind-badge"></span>
+    <span class="chip" id="fork-badge" hidden></span>
+  </div>
+  <div id="viewer"></div>
+  <div id="caption"></div>
+  <div id="transport">
+    <button id="btn-first" title="First step">⏮</button>
+    <button id="btn-back" title="Step back">‹ Step</button>
+    <button id="btn-play">▶ Play</button>
+    <button id="btn-fwd" title="Step forward">Step ›</button>
+    <input type="range" id="scrub" min="1" value="1">
+    <span id="readout">Step – of –</span>
+    <select id="speed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select>
+  </div>
+
+  <div class="panels">
+    <div class="panel" id="panel-notes">
+      <h3>Notes</h3>
+      <ul id="notes-list"></ul>
+      <textarea id="note-text" rows="2" placeholder="Write a note on this step — it is saved into the recording itself"></textarea>
+      <button id="btn-note">Save note at this step</button>
+      <div class="locked-why" id="note-lock" hidden></div>
+    </div>
+
+    <div class="panel" id="panel-fork">
+      <h3>Try it differently from here</h3>
+      <input type="text" id="fork-note" placeholder="New instruction at this step">
+      <button id="btn-fork">Start a What-if from this step</button>
+      <div class="locked-why" id="fork-lock" hidden></div>
+      <div id="refusal"></div>
+    </div>
+
+    <div class="panel" id="panel-clamp" hidden>
+      <h3>Change this step</h3>
+      <p>Like fixing a cell in a spreadsheet. The steps after it redo themselves. The original never changes.</p>
+      <label>Cell <select id="clamp-cell"></select></label>
+      <label>New value <input type="number" id="clamp-value"></label>
+      <button id="btn-clamp">Make the What-if</button>
+      <div class="locked-why" id="clamp-lock" hidden></div>
+      <div class="ok-note" id="clamp-ok"></div>
+    </div>
+
+    <div class="panel" id="panel-explain" hidden>
+      <h3>What went wrong?</h3>
+      <p>Pick a figure and the value it should have been. The recording
+      works backward to every single recorded input that, changed on
+      its own, would have made it come out that way. Each answer is
+      re-run and checked before it is shown, and each is kept as its
+      own What-if. Nothing is chosen for you.</p>
+      <label>Figure <select id="explain-target"></select></label>
+      <label>It should have been <input type="number" id="explain-desired"></label>
+      <button id="btn-explain">Work backward</button>
+      <div class="locked-why" id="explain-lock" hidden></div>
+      <ul id="explain-list"></ul>
+      <div class="ok-note" id="explain-none"></div>
+    </div>
+
+    <div class="panel" id="panel-wf" hidden>
+      <h3>Where did this come from?</h3>
+      <label>Row <input type="number" id="wf-row" value="0" min="0"></label>
+      <label>Column <input type="number" id="wf-col" value="0" min="0"></label>
+      <button id="btn-wf">Ask</button>
+      <p id="wf-out"></p>
+    </div>
+
+    <div class="panel" id="panel-rules">
+      <h3>House rules</h3>
+      <ul id="rules-list"></ul>
+      <p id="rules-none" class="locked-why">No house rules are pinned on this version.</p>
+    </div>
+
+    <div class="panel" id="panel-shelf">
+      <h3>On the shelf</h3>
+      <p id="shelf-status"></p>
+      <div id="shelf-keep" hidden>
+        <input type="text" id="shelf-name" placeholder="Name for this What-if on the shelf">
+        <button id="btn-promote">Keep this What-if on the shelf</button>
+      </div>
+      <button id="btn-demote" hidden>Take this What-if off the shelf</button>
+      <div class="locked-why" id="shelf-note"></div>
+    </div>
+
+    <div class="panel" id="panel-hear">
+      <h3>Hear this version</h3>
+      <p>The story of this version, in words: what was changed, what
+      redid itself, and what it came out as. Where this machine has a
+      voice, the story is spoken and the recording keeps the sound.</p>
+      <button id="btn-narrate">Tell the story of this version</button>
+      <p id="narr-script"></p>
+      <div id="narr-audio"></div>
+      <div class="locked-why" id="narr-note"></div>
+    </div>
+
+    <div class="panel" id="panel-map">
+      <h3>The map of this recording</h3>
+      <p class="locked-why">One lane per version, one mark per step, laid
+      out on the steps they share. A gold diamond is a house rule being
+      pinned at that step; a pale ring is where another version split
+      off; a small dot under a step is a note pinned to it. Click any
+      step to go to it.</p>
+      <div id="map-box"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const KIND = { 'native': 'Full recording', 'structure': 'Outline recording',
+               'screen-only': 'Video-only recording' };
+const INPUT_CELLS = ['wages', 'withholding', 'other_income', 'threshold_limit'];
+
+const state = { stores: [], storeId: null, branch: null, detail: null,
+                step: 1, playing: false, timer: 0, speed: 1, calm: false,
+                meta: [], cache: {} };
+
+// =====================================================================
+// The spice mapping — copied verbatim from the player v3 surface.
+// One pure function turns what a recording kept (its fidelity) and a
+// branch's checking state into how its strand looks: density,
+// thickness, glow, grain. Nothing glows that the keeping does not
+// support; nothing is steady until it re-executes and holds.
+// =====================================================================
+const FIDELITY_ORDER = { 'screen-only': 0, 'structure': 1, 'native': 2 };
+function visualParams(fidelity, vstate) {
+  const base = {
+    'native':      { density: 1.00, thickness: 3.4, glow: 1.00, grain: 0.05, alpha: 0.96 },
+    'structure':   { density: 0.55, thickness: 2.1, glow: 0.45, grain: 0.35, alpha: 0.78 },
+    'screen-only': { density: 0.26, thickness: 1.1, glow: 0.14, grain: 0.85, alpha: 0.55 }
+  }[fidelity] || { density: 0.26, thickness: 1.1, glow: 0.14, grain: 0.85, alpha: 0.55 };
+  const check = {
+    'verified':  { stability: 1.00, flicker: 0.00, alphaMul: 1.00, taper: 1.00 },
+    'candidate': { stability: 0.45, flicker: 0.65, alphaMul: 0.80, taper: 0.80 },
+    'failed':    { stability: 0.15, flicker: 0.25, alphaMul: 0.35, taper: 0.22 }
+  }[vstate || 'verified'];
+  return { density: base.density, thickness: base.thickness, glow: base.glow,
+           grain: base.grain, alpha: base.alpha * check.alphaMul,
+           stability: check.stability, flicker: check.flicker, taper: check.taper,
+           order: FIDELITY_ORDER[fidelity] };
+}
+const STRAND_COLORS = ['#ffb347', '#57c7b8', '#8fa3c4', '#c9a7ff', '#aab4c8', '#e0a458'];
+
+// ---------------- API ----------------
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  let data = null;
+  try { data = await r.json(); } catch (e) { /* frame bytes etc. */ }
+  if (!r.ok) { const err = new Error((data && data.error) || ('HTTP ' + r.status));
+               err.status = r.status; err.data = data; throw err; }
+  return data;
+}
+const branchURL = (step) => '/api/store/' + encodeURIComponent(state.storeId) +
+  '/branch/' + encodeURIComponent(state.branch) + (step || '');
+
+// ---------------- boot ----------------
+async function boot() {
+  let stores;
+  try { stores = await api('/api/stores'); }
+  catch (e) { $('#unreachable').hidden = false; return; }
+  state.stores = stores;
+  $('#volume-wrap').hidden = false;
+  renderLegend(); renderTabs();
+  await renderShelf();
+  if (stores.length) {
+    const first = stores[0];
+    await selectStore(first.id, first.branches[0] && first.branches[0].name);
+  }
+}
+
+function renderLegend() {
+  $('#vol-legend').innerHTML =
+    '<b>How to read the volume.</b> ' +
+    'Thick and bright = the recording kept everything, and the other way was re-run and checked. ' +
+    'Thin and grainy = only pictures of the screen were kept, so the strand is faint and speckled. ' +
+    'Middle weight, steady blue-grey = the recording kept the parts of the screen, not the words. ' +
+    'Shimmering = an idea that has not been re-run yet. ' +
+    'Faded and thinning away = it was re-run and did not hold. ' +
+    'The bright line that never flickers is the Golden Path — the work as it actually happened. ' +
+    'Along the bottom is the shelf: other ways that were kept but not followed, drifting slowly. ' +
+    'Nothing here glows brighter than what was kept and checked.';
+}
+
+function renderTabs() {
+  $('#tabs').innerHTML = state.stores.map(s =>
+    '<button data-store="' + esc(s.id) + '"' +
+    (s.id === state.storeId ? ' class="on"' : '') + '>' + esc(s.label) + '</button>').join('');
+  for (const b of $('#tabs').querySelectorAll('button'))
+    b.onclick = () => { const st = state.stores.find(x => x.id === b.dataset.store);
+                        selectStore(st.id, st.branches[0] && st.branches[0].name); };
+}
+
+function renderVersions() {
+  const st = state.stores.find(x => x.id === state.storeId);
+  $('#versions').innerHTML = st.branches.map(b =>
+    '<button data-branch="' + esc(b.name) + '"' +
+    (b.name === state.branch ? ' class="on"' : '') + '>' +
+    esc(b.fork ? 'What-if · ' + b.name : 'Original · ' + b.name) + '</button>').join('');
+  for (const b of $('#versions').querySelectorAll('button'))
+    b.onclick = () => selectBranch(b.dataset.branch);
+}
+
+async function selectStore(id, branch) {
+  state.storeId = id; stopPlay();
+  renderTabs();
+  if (branch) await selectBranch(branch); else renderVersions();
+}
+
+async function selectBranch(name) {
+  state.branch = name; state.cache = {}; state.meta = []; stopPlay();
+  renderVersions();
+  let detail;
+  try { detail = await api(branchURL()); }
+  catch (e) { $('#caption').textContent = 'Could not open this version: ' + e.message; return; }
+  state.detail = detail;
+  $('#surface').hidden = false;
+  const seal = $('#seal');
+  if (detail.seal) { seal.className = 'chip seal-ok'; seal.textContent = '✓ Recording checked'; }
+  else { seal.className = 'chip seal-bad'; seal.textContent = '✗ This recording does not check out'; }
+  $('#kind-badge').textContent = KIND[detail.fidelity] || detail.fidelity;
+  const fb = $('#fork-badge');
+  if (detail.fork) { fb.hidden = false;
+    fb.textContent = 'What-if — from ' + detail.fork.parent_branch + ', step ' + detail.fork.split_step; }
+  else fb.hidden = true;
+  // fidelity locks, in the design's own sentences
+  const lock = (panelBtn, lockEl, op) => {
+    const why = detail.refusals[op];
+    $(panelBtn).disabled = !!why;
+    const el = $(lockEl);
+    if (why) { el.hidden = false; el.textContent = why; } else el.hidden = true;
+  };
+  lock('#btn-note', '#note-lock', 'annotate');
+  lock('#btn-fork', '#fork-lock', 'fork');
+  const comp = detail.computation;
+  $('#panel-clamp').hidden = !(detail.kind === 'workbook' ||
+    (detail.kind === 'session' && comp));
+  if (detail.kind === 'session' && comp) {
+    $('#clamp-cell').innerHTML = Object.keys(comp.inputs).map(p =>
+      '<option>' + esc(p) + '</option>').join('');
+    lock('#btn-clamp', '#clamp-lock', 'clamp');
+  }
+  $('#panel-explain').hidden = detail.kind !== 'session';
+  if (detail.kind === 'session') {
+    const exLock = $('#explain-lock');
+    if (comp) {
+      $('#explain-target').innerHTML = Object.keys(comp.figures).map(p =>
+        '<option>' + esc(p) + '</option>').join('');
+      lock('#btn-explain', '#explain-lock', 'clamp');
+    } else {
+      $('#btn-explain').disabled = true;
+      exLock.hidden = false;
+      exLock.textContent = 'This recording carries no recorded computation to work backward from.';
+    }
+    $('#explain-list').innerHTML = '';
+    $('#explain-none').textContent = '';
+  }
+  $('#panel-wf').hidden = !(detail.caps.includes('provenance') && detail.kind === 'session');
+  const scrub = $('#scrub');
+  scrub.max = detail.steps; scrub.value = 1;
+  renderNotes(); renderRules();
+  renderShelfPanel(); renderNarration();
+  state.mapData = null; renderMap();
+  if (detail.kind === 'video') {
+    state.meta = await Promise.all(Array.from({length: detail.steps}, (_, i) =>
+      api(branchURL('/step/' + (i + 1) + '?meta=1')).catch(() => ({ts: i}))));
+    state.stepIndex = {};
+    state.meta.forEach((m, i) => { if (m && m.event_id) state.stepIndex[m.event_id] = i + 1; });
+    renderNotes();
+  }
+  if (detail.kind === 'workbook') {
+    const last = await api(branchURL('/step/' + detail.steps));
+    const cells = INPUT_CELLS.filter(c => last.values && c in last.values);
+    $('#clamp-cell').innerHTML = cells.map(c => '<option>' + esc(c) + '</option>').join('');
+  }
+  drawVolume();
+  await gotoStep(1);
+}
+
+function renderNotes() {
+  const notes = state.detail.notes || [];
+  $('#notes-list').innerHTML = notes.length
+    ? notes.map(n => '<li>Step ' + esc(stepOfEvent(n.at_event)) + ' — ' + esc(n.text) + '</li>').join('')
+    : '<li class="locked-why">No notes yet on this version.</li>';
+}
+function stepOfEvent(eventId) {
+  // notes carry the event id they were pinned to; the surface shows the
+  // step when it can resolve it from the fetched step list, else the id.
+  const hit = (state.stepIndex || {})[eventId];
+  return hit ? hit : ('event ' + eventId);
+}
+// ---------------- the shelf (M11) ----------------
+function provText(p) {
+  if (!p) return '';
+  if (p.via === 'clamp' && p.detail && p.detail.clamped) {
+    const what = Object.entries(p.detail.clamped)
+      .map(([t, v]) => t.split('/').pop() + ' set to ' + v).join(', ');
+    return 'Made by changing a step of ' + p.parent_branch + ' (' + what + ').';
+  }
+  if (p.via === 'explain' && p.detail && p.detail.explained) {
+    return 'One answer to "what went wrong?" on ' + p.parent_branch +
+      ': ' + p.detail.explained.target + ' should have been ' +
+      p.detail.explained.desired + '. Re-run and checked.';
+  }
+  return 'Made from ' + p.parent_branch +
+    (p.instruction ? ': "' + p.instruction + '"' : '.');
+}
+
+async function renderShelf() {
+  let shelf;
+  try { shelf = await api('/api/shelf'); } catch (e) { return; }
+  state.shelf = shelf;
+  $('#shelf-view').hidden = false;
+  $('#shelf-cards').innerHTML = shelf.map(card => {
+    const keptCount = card.branches.filter(b => b.kept && b.kept.kept).length;
+    const rows = card.branches.map(b => {
+      const title = b.kept && b.kept.kept
+        ? '<span class="kept-name">' + esc(b.kept.name) + '</span> <span class="prov">kept What-if · ' + esc(b.name) + '</span>'
+        : '<b>' + esc(b.fork ? 'What-if · ' + b.name : 'Original · ' + b.name) + '</b>';
+      const facts = (KIND[b.fidelity] || b.fidelity) + ' · ' + b.steps + ' steps' +
+        (b.fork ? ' · from ' + esc(b.fork.parent_branch) + ', step ' + b.fork.split_step : '') +
+        (b.pin_status ? ' · Golden Path: ' + esc(b.pin_status) : '') +
+        (b.narration ? ' · has a spoken story' : '');
+      return '<div class="shelf-row">' +
+        '<span class="chip ' + (b.seal ? 'seal-ok' : 'seal-bad') + '">' +
+          (b.seal ? '✓ Recording checked' : '✗ does not check out') + '</span>' +
+        '<span class="grow">' + title +
+          '<span class="prov">' + facts + '</span>' +
+          (b.provenance ? '<span class="prov">' + esc(provText(b.provenance)) + '</span>' : '') +
+        '</span>' +
+        '<button data-store="' + esc(card.id) + '" data-branch="' + esc(b.name) + '">Open</button>' +
+        '</div>';
+    }).join('');
+    return '<div class="shelf-card"><h3>' + esc(card.label) + '</h3>' +
+      '<div class="meta">' + card.branch_count + ' version' +
+      (card.branch_count === 1 ? '' : 's') + ' · ' + keptCount +
+      ' kept on the shelf</div>' + rows + '</div>';
+  }).join('');
+  for (const btn of $('#shelf-cards').querySelectorAll('button[data-branch]'))
+    btn.onclick = async () => {
+      await selectStore(btn.dataset.store, btn.dataset.branch);
+      $('#surface').scrollIntoView({ behavior: 'smooth' });
+    };
+}
+$('#btn-shelf').onclick = async () => {
+  await renderShelf();
+  $('#shelf-view').scrollIntoView({ behavior: 'smooth' });
+};
+
+function renderShelfPanel() {
+  const d = state.detail; if (!d) return;
+  const status = $('#shelf-status'), keep = $('#shelf-keep'),
+        dem = $('#btn-demote'), note = $('#shelf-note');
+  note.textContent = d.provenance ? provText(d.provenance) : '';
+  if (!d.fork) {
+    status.textContent = 'This is the Original — the recording itself. It is always on the shelf.';
+    keep.hidden = true; dem.hidden = true;
+    return;
+  }
+  if (d.kept && d.kept.kept) {
+    status.innerHTML = 'Kept on the shelf as <span class="kept-name">' +
+      esc(d.kept.name) + '</span>, next to its Original.';
+    keep.hidden = true; dem.hidden = false;
+  } else {
+    status.textContent = 'This What-if is not on the shelf. Keeping it gives it a name and a place on the shelf, with how it was made written on it. The Original never changes.';
+    keep.hidden = false; dem.hidden = true;
+  }
+}
+$('#btn-promote').onclick = async () => {
+  const name = $('#shelf-name').value.trim();
+  if (!name) { $('#shelf-note').textContent = 'Give the What-if a name first.'; return; }
+  try {
+    const r = await api(branchURL('/promote'), { method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name}) });
+    state.detail.kept = r; $('#shelf-name').value = '';
+    renderShelfPanel(); await renderShelf(); drawVolume();
+  } catch (e) { $('#shelf-note').textContent = e.message; }
+};
+$('#btn-demote').onclick = async () => {
+  try {
+    const r = await api(branchURL('/demote'), { method: 'POST',
+      headers: {'Content-Type': 'application/json'}, body: '{}' });
+    state.detail.kept = r;
+    renderShelfPanel(); await renderShelf(); drawVolume();
+  } catch (e) { $('#shelf-note').textContent = e.message; }
+};
+
+// ---------------- narration (M11) ----------------
+function renderNarration() {
+  const n = state.detail && state.detail.narration;
+  const scriptEl = $('#narr-script'), box = $('#narr-audio'), note = $('#narr-note');
+  box.innerHTML = ''; note.textContent = '';
+  scriptEl.textContent = n ? n.script : '';
+  if (n && n.has_audio) {
+    const a = document.createElement('audio');
+    a.controls = true; a.className = 'narr';
+    a.src = branchURL('/narration/audio');
+    box.appendChild(a);
+    note.textContent = 'Voice: ' + n.engine + '. The sound is kept in the recording itself.';
+  } else if (n) {
+    note.textContent = 'This story is words only here — no voice spoke it on this machine.';
+  }
+}
+$('#btn-narrate').onclick = async () => {
+  const note = $('#narr-note'); note.textContent = '';
+  try {
+    const r = await api(branchURL('/narration'), { method: 'POST',
+      headers: {'Content-Type': 'application/json'}, body: '{}' });
+    state.detail.narration = r;
+    renderNarration();
+    if (!r.has_audio) note.textContent = r.audio_note || '';
+    state.mapStale = true;
+  } catch (e) { note.textContent = e.message; }
+};
+
+// ---------------- the spatial map (M11) ----------------
+function colorFor(branch) {
+  const s = strands().find(x => x.store.id === state.storeId &&
+                               x.branch.name === branch);
+  return s ? s.color : '#aab4c8';
+}
+async function renderMap() {
+  const box = $('#map-box'); if (!box || !state.branch) return;
+  if (!state.mapData || state.mapStale) {
+    try {
+      state.mapData = await api('/api/store/' +
+        encodeURIComponent(state.storeId) + '/branch/' +
+        encodeURIComponent(state.branch) + '/map');
+      state.mapStale = false;
+    } catch (e) { box.innerHTML = ''; return; }
+  }
+  const map = state.mapData;
+  const laneH = 40, top = 6, left = 10;
+  const maxSteps = Math.max(1, ...map.lanes.map(l => l.steps.length));
+  const dx = Math.max(15, Math.min(30, 1000 / maxSteps));
+  const W = left * 2 + 20 + maxSteps * dx;
+  const H = top * 2 + map.lanes.length * laneH + 6;
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Map of this recording">';
+  for (const lane of map.lanes) {
+    const li = map.lanes.indexOf(lane);
+    const y = top + li * laneH + 24;
+    const col = colorFor(lane.branch);
+    const label = lane.kept && lane.kept.kept ? lane.kept.name
+      : (lane.original ? 'Original · ' + lane.branch : 'What-if · ' + lane.branch);
+    svg += '<text class="lane-label" x="' + left + '" y="' + (y - 11) + '">' +
+      esc(label) + '</text>';
+    svg += '<line x1="' + (left + 16) + '" y1="' + y + '" x2="' +
+      (left + 16 + (maxSteps - 1) * dx) + '" y2="' + y +
+      '" stroke="' + col + '" stroke-width="1.4" opacity="0.45"/>';
+    for (const s of lane.steps) {
+      const x = left + 16 + (s.n - 1) * dx;
+      const cur = lane.branch === state.branch && s.n === state.step;
+      if (s.markers.includes('checkpoint'))
+        svg += '<circle cx="' + x + '" cy="' + y + '" r="8.5" fill="none" stroke="#e8e6f2" stroke-width="1" opacity="0.55"/>';
+      svg += '<circle class="map-step" data-branch="' + esc(lane.branch) +
+        '" data-step="' + s.n + '" cx="' + x + '" cy="' + y + '" r="' +
+        (cur ? 7 : 5) + '" fill="' + col + '"' +
+        (cur ? ' stroke="#fff" stroke-width="2"' : '') +
+        ' style="cursor:pointer"><title>' + esc(lane.branch) +
+        ' — step ' + s.n + ' (' + esc(s.kind) + ')</title></circle>';
+      if (s.markers.includes('pin'))
+        svg += '<rect x="' + (x - 3.5) + '" y="' + (y - 16) +
+          '" width="7" height="7" transform="rotate(45 ' + x + ' ' +
+          (y - 12.5) + ')" fill="#ffb347"/>';
+      if (s.markers.includes('note'))
+        svg += '<circle cx="' + x + '" cy="' + (y + 11) + '" r="2.2" fill="#e8e6f2"/>';
+    }
+  }
+  svg += '</svg>';
+  box.innerHTML = svg;
+  for (const c of box.querySelectorAll('.map-step'))
+    c.onclick = () => mapGo(c.dataset.branch, +c.dataset.step);
+}
+async function mapGo(branch, n) {
+  if (branch === state.branch) { stopPlay(); await gotoStep(n); return; }
+  await selectBranch(branch);
+  await gotoStep(n);
+}
+
+function renderRules() {
+  const rules = state.detail.house_rules || [];
+  $('#rules-none').hidden = rules.length > 0;
+  $('#rules-list').innerHTML = rules.map(r =>
+    '<li><b>' + esc(r.target) + '</b> must stay ' + esc(r.pinned) +
+    ' — currently ' + esc(r.current === null ? 'not computable here' : r.current) +
+    ' → <b>' + esc(r.status) + '</b></li>').join('');
+}
+
+// ---------------- steps & transport ----------------
+async function gotoStep(n) {
+  const d = state.detail; if (!d) return;
+  n = Math.max(1, Math.min(d.steps, n));
+  state.step = n;
+  $('#scrub').value = n;
+  $('#readout').textContent = 'Step ' + n + ' of ' + d.steps;
+  const viewer = $('#viewer');
+  if (d.kind === 'video') {
+    viewer.innerHTML = '';
+    const img = new Image();
+    img.alt = 'Step ' + n + ' of ' + d.steps;
+    img.src = branchURL('/step/' + n);
+    viewer.appendChild(img);
+    const ts = state.meta[n - 1] && state.meta[n - 1].ts;
+    $('#caption').textContent = ts != null ? 'Kept picture, ' + ts.toFixed(1) + 's into the recording' : '';
+  } else {
+    let payload = state.cache[n];
+    if (!payload) { payload = await api(branchURL('/step/' + n)); state.cache[n] = payload; }
+    if (!state.stepIndex) state.stepIndex = {};
+    state.stepIndex[payload.event_id] = n;
+    if (d.kind === 'workbook') {
+      const vals = payload.values || {};
+      viewer.innerHTML = '<table>' + Object.keys(vals).sort().map(k =>
+        '<tr><td>' + esc(k) + '</td><td class="val">' +
+        esc(vals[k] === null ? '—' : vals[k]) + '</td></tr>').join('') + '</table>';
+      $('#caption').textContent = payload.label || '';
+    } else if (d.kind === 'session') {
+      viewer.innerHTML = '';
+      const pre = document.createElement('pre');
+      pre.textContent = payload.screen || '';
+      viewer.appendChild(pre);
+      $('#caption').textContent = 'Step ' + n + ' — a ' + (payload.event_kind || 'step') + ' step';
+    } else {
+      viewer.innerHTML = '';
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(payload.parts || payload, null, 1);
+      viewer.appendChild(pre);
+      $('#caption').textContent = 'Step ' + n + ' — the parts of the screen at this step';
+    }
+  }
+  drawVolume();
+  renderMap();
+}
+
+function dwell() {
+  const d = state.detail;
+  if (d.kind === 'video') {
+    const a = state.meta[state.step - 1], b = state.meta[state.step];
+    const dt = a && b && b.ts != null && a.ts != null ? (b.ts - a.ts) : 0.9;
+    return Math.min(3, Math.max(0.25, dt)) * 1000 / state.speed;
+  }
+  return 900 / state.speed;
+}
+function tick() {
+  if (!state.playing) return;
+  if (state.step >= state.detail.steps) { stopPlay(); return; }
+  state.timer = setTimeout(async () => { await gotoStep(state.step + 1); tick(); }, dwell());
+}
+function stopPlay() {
+  state.playing = false; clearTimeout(state.timer);
+  const b = $('#btn-play'); if (b) b.textContent = '▶ Play';
+}
+$('#btn-play').onclick = () => {
+  if (state.playing) { stopPlay(); return; }
+  if (state.step >= state.detail.steps) gotoStep(1);
+  state.playing = true; $('#btn-play').textContent = '⏸ Pause'; tick();
+};
+$('#btn-first').onclick = () => { stopPlay(); gotoStep(1); };
+$('#btn-back').onclick = () => { stopPlay(); gotoStep(state.step - 1); };
+$('#btn-fwd').onclick = () => { stopPlay(); gotoStep(state.step + 1); };
+$('#scrub').oninput = e => { stopPlay(); gotoStep(+e.target.value); };
+$('#speed').onchange = e => { state.speed = +e.target.value; };
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input, textarea, select')) return;
+  if (e.code === 'Space') { e.preventDefault(); $('#btn-play').click(); }
+  if (e.code === 'ArrowRight') $('#btn-fwd').click();
+  if (e.code === 'ArrowLeft') $('#btn-back').click();
+});
+
+// ---------------- notes / fork / clamp / where-from ----------------
+$('#btn-note').onclick = async () => {
+  const text = $('#note-text').value.trim(); if (!text) return;
+  try {
+    const r = await api(branchURL('/note'), { method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({step: state.step, text}) });
+    state.detail.notes = r.notes; $('#note-text').value = ''; renderNotes();
+    state.mapStale = true; renderMap();
+  } catch (e) { $('#note-lock').hidden = false; $('#note-lock').textContent = e.message; }
+};
+
+$('#btn-fork').onclick = async () => {
+  const out = $('#refusal'); out.textContent = '';
+  try {
+    const r = await api(branchURL('/fork'), { method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({step: state.step, note: $('#fork-note').value}) });
+    await refreshStores(r.branch);
+  } catch (e) { out.textContent = e.message; }
+};
+
+$('#btn-clamp').onclick = async () => {
+  const out = $('#refusal'); out.textContent = '';
+  $('#clamp-ok').textContent = '';
+  const cell = $('#clamp-cell').value;
+  const value = parseFloat($('#clamp-value').value);
+  if (isNaN(value)) { out.textContent = 'Give the cell a number first.'; return; }
+  try {
+    const r = await api(branchURL('/fork'), { method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({clamp: {cell, value}}) });
+    if (r.recomputed) {
+      $('#clamp-ok').textContent = 'What-if made: ' + r.branch +
+        ' — total tax ' + r.values['/totalTax'] + ', refund ' +
+        r.values['/refund'] + '. Steps that redid themselves: ' +
+        r.recomputed.join(', ') + '. Steps left as recorded: ' +
+        r.reused.join(', ') + '.';
+    } else {
+      $('#clamp-ok').textContent = 'What-if made: ' + r.branch +
+        ' — tax ' + r.values.tax + ', refund ' + r.values.refund +
+        '. It is a real version in the store now.';
+    }
+    await refreshStores(r.branch);
+  } catch (e) { out.textContent = (e.data && e.data.reason) || e.message; }
+};
+
+$('#btn-explain').onclick = async () => {
+  const list = $('#explain-list'); list.innerHTML = '';
+  const none = $('#explain-none'); none.textContent = '';
+  const target = $('#explain-target').value;
+  const desired = parseFloat($('#explain-desired').value);
+  if (isNaN(desired)) { none.textContent = 'Give the figure the value it should have been first.'; return; }
+  try {
+    const r = await api(branchURL('/explain'), { method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({target, desired}) });
+    if (!r.candidates.length) {
+      none.textContent = 'No single recorded input, changed on its own, makes ' +
+        target + ' come out ' + desired + '. Nothing was made up. The answer ' +
+        'may need two changes at once, which this recording cannot test on its own.';
+      return;
+    }
+    for (const c of r.candidates) {
+      const li = document.createElement('li');
+      if (c.accepted) {
+        li.innerHTML = 'If <b>' + esc(c.input) + '</b> had been <b>' + esc(c.to) +
+          '</b> instead of ' + esc(c.from) + ': ' + esc(r.target) + ' comes out ' +
+          esc(c.figures[r.target]) + '. Re-run and checked ✓ — kept as a What-if.';
+        const b = document.createElement('button');
+        b.textContent = 'Look at this What-if';
+        b.onclick = () => refreshStores(c.branch);
+        li.appendChild(document.createElement('br'));
+        li.appendChild(b);
+      } else {
+        li.innerHTML = 'If <b>' + esc(c.input) + '</b> had been <b>' + esc(c.to) +
+          '</b>: blocked by a house rule (Golden Path) — ' + esc(c.reason) +
+          ' Nothing was made.';
+      }
+      list.appendChild(li);
+    }
+    // Light refresh only: a full selectBranch would wipe the answers
+    // just rendered. The versions row learns the new What-ifs; the
+    // surface stays exactly where the user is.
+    state.stores = await api('/api/stores');
+    renderTabs(); renderVersions();
+  } catch (e) { none.textContent = (e.data && e.data.error) || e.message; }
+};
+
+async function refreshStores(selectBranchName) {
+  const keepStore = state.storeId;
+  state.stores = await api('/api/stores');
+  renderTabs();
+  await renderShelf();
+  await selectStore(keepStore, selectBranchName ||
+    state.stores.find(s => s.id === keepStore).branches[0].name);
+}
+
+$('#btn-wf').onclick = async () => {
+  try {
+    const r = await api(branchURL('/wherefrom/' + state.step) +
+      '?row=' + (+$('#wf-row').value || 0) + '&col=' + (+$('#wf-col').value || 0));
+    $('#wf-out').textContent = r.sentence || JSON.stringify(r);
+  } catch (e) { $('#wf-out').textContent = e.message; }
+};
+
+// ---------------- the volume ----------------
+const vol = { raf: 0, running: false, seeds: {} };
+function mulberry(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function strands() {
+  // built only from what the service reported: one strand per branch
+  const out = [];
+  state.stores.forEach((s, si) => s.branches.forEach((b, bi) => out.push({
+    key: s.id + '/' + b.name, store: s, branch: b,
+    color: STRAND_COLORS[(si + bi) % STRAND_COLORS.length],
+    active: s.id === state.storeId && b.name === state.branch })));
+  return out;
+}
+function drawVolume() {
+  const cv = $('#vol-canvas'); if (!cv) return;
+  const ctx = cv.getContext && cv.getContext('2d');
+  const list = strands();
+  $('#vol-strands').innerHTML = list.map(s => {
+    const p = visualParams(s.branch.fidelity, 'verified');
+    return '<span><span class="dotp" style="background:' + s.color + ';opacity:' + p.alpha +
+      ';box-shadow:0 0 ' + Math.round(p.glow * 10) + 'px ' + s.color + '"></span><b>' +
+      esc(s.store.label) + ' · ' + esc(s.branch.name) + '</b> · ' + (KIND[s.branch.fidelity] || '') +
+      ' · ' + s.branch.steps + ' steps · ' +
+      (s.branch.seal ? 'Recording checked ✓' : 'does not check out') + '</span>';
+  }).join('');
+  const povNames = { video: 'the kept pictures', workbook: 'the workbook', session: 'the work session' };
+  if (state.detail) $('#vol-pov').textContent = 'Your eye is on ' + state.detail.branch +
+    (povNames[state.detail.kind] ? ' (' + povNames[state.detail.kind] + ')' : '') +
+    ', step ' + state.step + ' of ' + state.detail.steps + '. Scrubbing moves your eye through the volume.';
+  if (!ctx) return;
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#141126'; ctx.fillRect(0, 0, W, H);
+  const rows = list.filter(s => !s.branch.fork || s.active);
+  const shelf = list.filter(s => s.branch.fork && !s.active);
+  const x0 = 0.06 * W, x1 = 0.94 * W;
+  const rowY = i => rows.length > 1 ? (0.14 + 0.62 * i / (rows.length - 1)) * H : 0.38 * H;
+  const t = performance.now() / 1000;
+  rows.forEach((s, i) => {
+    const y = rowY(i), p = visualParams(s.branch.fidelity, 'verified');
+    const rnd = mulberry(1234 + i * 77);
+    ctx.save();
+    ctx.globalAlpha = p.alpha * (s.active ? 1 : 0.55);
+    ctx.strokeStyle = s.color; ctx.lineWidth = p.thickness;
+    ctx.shadowColor = s.color; ctx.shadowBlur = p.glow * 12;
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    ctx.shadowBlur = 0;
+    const count = Math.round(160 * p.density);
+    for (let k = 0; k < count; k++) {
+      const fx = rnd(), fy = (rnd() - 0.5) * (6 + 26 * p.grain);
+      const drift = s.active ? Math.sin(t * 0.6 + k) * 1.5 * p.stability : Math.sin(t * 0.2 + k * 1.7) * 1.1;
+      ctx.globalAlpha = p.alpha * (0.25 + 0.55 * rnd());
+      ctx.fillStyle = s.color;
+      ctx.fillRect(x0 + fx * (x1 - x0), y + fy + drift, p.grain > 0.5 ? 1.6 : 2.2, 2.2);
+    }
+    ctx.restore();
+    if (s.active && state.detail) {
+      const fx = state.detail.steps > 1 ? (state.step - 1) / (state.detail.steps - 1) : 0;
+      const px = x0 + fx * (x1 - x0);
+      ctx.save();
+      const grad = ctx.createLinearGradient(px - 26, 0, px + 26, 0);
+      grad.addColorStop(0, 'rgba(255,179,71,0)'); grad.addColorStop(0.5, 'rgba(255,179,71,0.20)');
+      grad.addColorStop(1, 'rgba(255,179,71,0)');
+      ctx.fillStyle = grad; ctx.fillRect(px - 26, 0, 52, H * 0.86);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px, y, 4.2, 0, 7); ctx.fill();
+      ctx.restore();
+    }
+  });
+  // the shelf: kept What-ifs that are not being followed, dim, drifting
+  const sy = 0.925 * H;
+  ctx.save(); ctx.fillStyle = '#9a94b8'; ctx.font = '11px sans-serif';
+  ctx.fillText('the shelf', x0, sy - 12);
+  shelf.forEach((s, i) => {
+    const p = visualParams(s.branch.fidelity, 'verified');
+    const yy = sy + Math.sin(t * 0.25 + i * 2.1) * 2;
+    ctx.globalAlpha = 0.34 * p.alpha; ctx.strokeStyle = s.color; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x0 + i * 8, yy); ctx.lineTo(x1 - i * 8, yy); ctx.stroke();
+  });
+  ctx.restore();
+}
+function loopVolume() {
+  if (state.calm || document.hidden) { vol.raf = 0; return; }
+  drawVolume();
+  vol.raf = requestAnimationFrame(loopVolume);
+}
+function startVolume() { if (!vol.raf && !state.calm && !document.hidden) vol.raf = requestAnimationFrame(loopVolume); }
+$('#calm').onchange = e => {
+  state.calm = e.target.checked;
+  if (state.calm) { if (vol.raf) cancelAnimationFrame(vol.raf); vol.raf = 0; drawVolume(); }
+  else startVolume();
+};
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (vol.raf) cancelAnimationFrame(vol.raf); vol.raf = 0; }
+  else startVolume();
+});
+
+boot().then(() => startVolume());
+</script>
+</body>
+</html>

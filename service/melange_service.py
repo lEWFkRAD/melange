@@ -226,6 +226,13 @@ def branch_detail(store, branch: str, entry: dict) -> dict:
         "caps": bridge.caps(store, branch),
         "refusals": refusals(fidelity),
         "steps": len(steps),
+        "timeline": [{"step": i, "event_id": ev["id"],
+                      "kind": ev["kind"],
+                      "ts": ev["payload"].get("ts", ev["mono_ns"] / 1_000_000_000)}
+                     for i, ev in enumerate(steps, 1)],
+        "computation_step": next((i for i, ev in reversed(list(enumerate(steps, 1)))
+                                  if ev["kind"] == "model_call"
+                                  and "figures" in ev["payload"]), None),
         "seal": bridge.seal(store, branch),
         "fork": fork,
         "house_rules": rules,
@@ -721,7 +728,10 @@ class Handler(BaseHTTPRequestHandler):
         target = (STATIC_DIR / name).resolve()
         if target.parent != STATIC_DIR.resolve() or not target.is_file():
             raise KeyError(name)
-        ctype = "text/html" if target.suffix == ".html" else "text/plain"
+        ctype = {".html": "text/html; charset=utf-8",
+                 ".css": "text/css; charset=utf-8",
+                 ".js": "text/javascript; charset=utf-8"}.get(
+                     target.suffix, "text/plain; charset=utf-8")
         return self._send(200, target.read_bytes(), ctype)
 
 

@@ -24,6 +24,10 @@ that does not verify reports `seal: false` in a normal 200 response.
 
 ## Run
 
+On Windows with WSL and Python 3.11+ installed, run `./start-melange.ps1`
+from the repository root, then open http://localhost:8798. Pass `-Port 8799`
+to use another port. Keep the terminal open while using the player.
+
 ```sh
 service/run.sh            # binds 127.0.0.1:8798
 # or:
@@ -57,10 +61,11 @@ first open if the timeline is absent. `profile_dir`/`fixture` locate
 the workbook profile used to evaluate clamp forks on workbook
 branches (needs openpyxl; loaded lazily, only for clamp requests).
 
-Preconfigured (`service/stores.json`): `desktop-real` (the real
-Hermes desktop capture, screen-only), `workbook` and
-`workbook-pinned` (the Excel return; the pinned copy carries the M7
-house rules), and `flagship` (generated under `service/stores/`).
+The default registry (`service/stores.json`) contains one synthetic return,
+generated under `service/stores/` on first open. It needs no external fixture
+files. Add your recording paths to a separate registry and set
+`MELANGE_STORES_FILE` to use them; workbook entries also need their profile
+and fixture. Paths from another machine are not included in the default.
 
 Adding another store (e.g. the 153-step live-session store, once it is
 copied to this machine) is a registry entry, not a code change.
@@ -95,10 +100,25 @@ the exception named — never hidden).
 
 ## The surface
 
-`static/index.html` builds its tabs from `GET /api/stores`, draws the
-spice volume from the fetched fidelity (v3's `visualParams`, verbatim,
-with its legend), opens branches live (seal chip reflects the response
-at open time), fetches steps on demand (desktop frames are image URLs
-into the step endpoint, not embedded base64), posts notes and forks
-back to the service, and — if the API is unreachable — shows an honest
-"cannot reach the recordings service" state with no fallback data.
+`static/index.html` is the default player: recording picker, version selector,
+screen, playback bar, and an optional side panel. All content comes from the
+live service. `player.js` ignores stale step responses, preserves the step
+when switching versions, plays at recorded pace (pauses bounded to 0.25–3
+seconds), and marks notes on the slider. The branch response includes a
+`timeline` of step numbers, event IDs, kinds and timestamps, plus the latest
+`computation_step`; neither requires downloading every frame first.
+
+Try the synthetic example: **Go to calculation → select Wages → enter
+48000 → Make the What-if**. The new calculation opens immediately with tax
+3,088 and refund 3,012. **Compare Original** returns to the unchanged tax
+3,568 and refund 2,532. Notes are saved through the bridge and survive reload.
+
+The simple player's numeric edits apply to session recordings with a recorded
+calculation. Desktop outlines and pictures retain playback and notes; their
+locked actions explain the limitation. Instruction What-ifs explicitly record
+intent and do not claim to have run. A broken seal permits watching but locks
+changes in the player. Empty and unreachable recordings have explicit states.
+
+**Advanced view** preserves the previous surface at `/static/advanced.html`,
+including the volume, map, workbook controls, explanations, house rules,
+narration and shelf management.
