@@ -7,14 +7,10 @@ surface (`static/index.html`) at `/`. It replaces the baked players:
 the surface holds **no recording data** — everything it shows was
 fetched from this service, from the stores on disk, at request time.
 
-M11 adds the rest of the volume doctrine to the same pattern: the
-surface lands on **the shelf** (every recording, its versions, their
-seals and Golden Path standings, and the kept What-ifs with their
-provenance), each open recording carries a **spatial map** of its
-lanes and steps that dives on click, and a version can **tell its
-story** — a narration composed from the record, spoken by the
-machine's speech engine where one exists and attached to the branch
-in the store. The library side is `living_replay/shelf.py`.
+The default surface is a recording player with a picker, version selector,
+playback bar and optional details panel. **Advanced view** retains M11's
+shelf, spatial map, kept What-ifs and recorded narration. The library side
+of those features is `living_replay/shelf.py`.
 
 Fidelity is enforced server-side by the library's own gates
 (`living_replay.ingest.require_branch_op` via the bridge): a refused
@@ -29,7 +25,7 @@ from the repository root, then open http://localhost:8798. Pass `-Port 8799`
 to use another port. Keep the terminal open while using the player.
 
 ```sh
-service/run.sh            # binds 127.0.0.1:8798
+python3 service/melange_service.py  # binds 127.0.0.1:8798
 # or:
 MELANGE_PORT=9000 PYTHONPATH=src:service python3 service/melange_service.py
 ```

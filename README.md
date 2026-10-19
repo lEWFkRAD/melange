@@ -10,11 +10,16 @@
 
 ## See it
 
-![The Melange shelf: the flagship example with its What-if branch and the Golden Path](docs/screenshots/surface-player.png)
+![Melange's dark player: a real Python test rerun with all six tests passing](docs/screenshots/player-dark.jpg)
 
-*The shelf in the static surface export: the synthetic flagship return, its
-verified What-if branch, and the volume map. Looking and scrubbing work from
-this baked copy; anything that changes a recording needs the live service.*
+**[Watch the 56-second release film](docs/media/melange-release.mp4)** ·
+Dark brass and cyan UI, Nous/Hermes visual theme, Joi narration, and genuine
+player footage of a synthetic coding task.
+
+Rewind the recorded work, change the retry budget from **2 to 3**, and run
+the Python tests again in a What-if. **Five passing tests become six**;
+**Compare Original** returns to the unchanged first run. The player keeps
+the code, process output, notes, and both versions together.
 
 ![The terminal viewer](docs/screenshots/tui-viewer.png)
 
@@ -41,7 +46,7 @@ see [LICENSE](LICENSE).
 PYTHONPATH=src python3 -m unittest discover -s tests
 ```
 
-**215 tests: 199 passed, 0 failed, 16 skipped** — measured 2026-10-19 on
+**225 tests: 209 passed, 0 failed, 16 skipped** - measured 2026-10-19 on
 WSL Ubuntu, Python 3.12.3, with pyte, Z3, cryptography, python-xlib, Tk,
 tmux and Xvfb. The skips require external workbook/store fixtures or the
 Firecracker sandbox (`LR_SANDBOX_DIR`). The GUI gate ran and passed.
@@ -64,12 +69,21 @@ Builds 1–3 below are the engine. The UX program (2026-10-16) added the operati
 
 ## Open the player
 
-Run `./start-melange.ps1` on Windows with WSL, or `service/run.sh` on Linux,
-then open http://localhost:8798. The default recording is a generated synthetic
-example. Play or slide through it, choose **Go to calculation**, click **Wages**,
-and try 48000. The player opens the recalculated What-if and lets you compare
-the unchanged Original. Notes are saved in the recording. See
-[`service/README.md`](service/README.md) for your own recordings and setup.
+From the repository root, run `./start-melange.ps1` on Windows with WSL,
+or `python3 service/melange_service.py` on Linux, then open
+http://localhost:8798. Python 3.11 or newer is required.
+
+The default recording is the synthetic **Hermes delivery client** coding task.
+Play or slide through it, choose **Go to test run**, select **Retry budget**,
+enter **3**, and click **Make the What-if**. The player runs the six tests in
+a real Python process and opens the passing result. **Compare Original**
+returns to the unchanged failing run. Notes are saved in the recording.
+
+This demo executes the bundled retry program with a bounded numeric input;
+it does not execute arbitrary code from a recording. The synthetic return
+example remains available in the recording picker. See
+[`service/README.md`](service/README.md) for setup, your own recordings,
+and the advanced view.
 
 ## Architecture
 
