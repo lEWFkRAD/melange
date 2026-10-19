@@ -5,8 +5,35 @@
 > SHATNER `living-replay` tree, and this VM's Build-3-era tree + `lr-live`
 > working files — module by module. See `UNIFICATION.md` for the full
 > per-module provenance table, the merge decisions, and the flagged
-> NOT-MERGED variants. The only remaining M1 step is creating the private
-> GitHub repo and pushing; no remote exists yet.
+> NOT-MERGED variants. The repository went public on 2026-10-19; see
+> `ROADMAP.md` for what is open and `CONTRIBUTING.md` for how to help.
+
+## See it
+
+![The Melange shelf: the flagship example with its What-if branch and the Golden Path](docs/screenshots/surface-player.png)
+
+*The shelf in the static surface export: the synthetic flagship return, its
+verified What-if branch, and the volume map. Looking and scrubbing work from
+this baked copy; anything that changes a recording needs the live service.*
+
+![The terminal viewer](docs/screenshots/tui-viewer.png)
+
+*The terminal viewer on a synthetic session: an explain run whose ghost
+branch forward-verified, shelved beside the untouched Original.*
+
+![The standalone timeline viewer](docs/screenshots/export-viewer.png)
+
+*Any timeline exports to one self-contained HTML viewer. Clicking a
+character shows exactly what caused it: the chunk, the tool event, and the
+byte offset.*
+
+## Contributing
+
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md)
+for setup and the rules (short version: nothing merges without
+forward-execution verification), and [ROADMAP.md](ROADMAP.md) for the open
+work, including pieces sized for a first contribution. Licensed under MIT;
+see [LICENSE](LICENSE).
 
 ## Tests — the canonical count
 
