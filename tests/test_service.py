@@ -335,7 +335,7 @@ function makeCtx() {
 }
 
 async function loadPage(origin, apiOrigin) {
-  const html = await (await fetch(origin + '/')).text();
+  const html = await (await fetch(origin + '/static/advanced.html')).text();
   const dom = new JSDOM(html, { runScripts: 'dangerously', url: origin + '/',
     pretendToBeVisual: true,
     beforeParse(window) {

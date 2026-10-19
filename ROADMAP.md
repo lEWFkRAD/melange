@@ -77,8 +77,14 @@ made by the CDP recorder.
 The public static surface is a baked export. Actions such as clamp and
 explain render as locked because they need the live service. The local
 `service/static/` surface already calls the service API; `service/run.sh`
-serves it. Open work is shared-hosting authentication, service API polish
-and frontend usability. The baked export remains the no-server demo.
+serves it. The default player now puts the recording and playback bar first,
+with optional step, inspection, note and correction panels. It opens real
+recalculated session results immediately and can compare the unchanged
+Original. The previous volume/map surface is available in Advanced view.
+Windows users can start the synthetic example with `./start-melange.ps1`
+(WSL required). Open work includes shared-hosting authentication and a
+similarly direct workflow for executable vendor-app recordings. The baked
+export remains the no-server demo.
 
 ### PANDA rung 4: opaque-binary taint
 

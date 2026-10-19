@@ -62,6 +62,15 @@ Harness-first, Linux-first reference for recording a controlled agent terminal a
 
 Builds 1–3 below are the engine. The UX program (2026-10-16) added the operating layer on top of the same store: `bridge.py` (the single UI-facing API — it enforces declared fidelity per branch, since the store does not; notes are real store events), `ingest.py` (Door 2: foreign traces and screen frames ingested at declared fidelity — native / structure / screen-only — with per-branch capability gates), and `tui.py` (terminal viewer). Design language: `docs/melange-ux-design.md`. Surface builders live in `tools/` (`build_surface.py`, `build_surface2.py`).
 
+## Open the player
+
+Run `./start-melange.ps1` on Windows with WSL, or `service/run.sh` on Linux,
+then open http://localhost:8798. The default recording is a generated synthetic
+example. Play or slide through it, choose **Go to calculation**, click **Wages**,
+and try 48000. The player opens the recalculated What-if and lets you compare
+the unchanged Original. Notes are saved in the recording. See
+[`service/README.md`](service/README.md) for your own recordings and setup.
+
 ## Architecture
 
 `PtyCapture` owns a pseudo-terminal, redacts bytes before they enter storage, appends `terminal_chunk` events with monotonic clock/byte offsets, and writes content-addressed payloads. `TimelineStore` is SQLite plus SHA-256 objects and per-branch hash chains. `Grid` is a deterministic ANSI terminal grid with per-cell `{offset, chunk_id, tool_event}` provenance. `reconstruct` decodes events/keyframes into a frame, and `provenance` returns an attribution or an explicit unattributed result.
