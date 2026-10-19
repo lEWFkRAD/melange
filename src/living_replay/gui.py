@@ -105,10 +105,88 @@ class GuiSession:
         xtest.fake_input(d, X.MotionNotify, x=x, y=y)
         xtest.fake_input(d, X.ButtonPress, 1); xtest.fake_input(d, X.ButtonRelease, 1)
         d.sync()
+        # Settle so the entry has input focus before the keys arrive; on a
+        # loaded machine an immediate burst can land before the focus does
+        # and the text goes nowhere.
+        time.sleep(0.15)
         for ch in text:
-            ks = d.keysym_to_keycode(ord(ch))
-            xtest.fake_input(d, X.KeyPress, ks); xtest.fake_input(d, X.KeyRelease, ks)
+            self._type_char(d, ch)
+            time.sleep(0.01)
         d.sync()
+
+    def _type_char(self, d, ch: str):
+        """One XTest keystroke for a character. keysym_to_keycode alone
+        loses shifted characters on many keymaps (it finds the keycode
+        that carries the keysym, but a bare press yields the unshifted
+        keysym, so 'D' arrives as 'd'); hold Shift when the character
+        lives on the shifted level of its keycode."""
+        from Xlib import X, XK
+        from Xlib.ext import xtest
+        ks = ord(ch)
+        kc = d.keysym_to_keycode(ks)
+        shift = False
+        if kc:
+            try:
+                levels = d.get_keyboard_mapping(kc, 1)[0]
+                shift = len(levels) > 1 and levels[1] == ks and levels[0] != ks
+            except Exception:
+                shift = ch.isupper()
+        shift_kc = d.keysym_to_keycode(XK.XK_Shift_L) if shift else 0
+        if shift_kc: xtest.fake_input(d, X.KeyPress, shift_kc)
+        xtest.fake_input(d, X.KeyPress, kc); xtest.fake_input(d, X.KeyRelease, kc)
+        if shift_kc: xtest.fake_input(d, X.KeyRelease, shift_kc)
+
+    def _clear_field(self, field_xy: tuple[int, int]):
+        from Xlib import X, XK
+        from Xlib.ext import xtest
+        d = self._x(); win = self._find_window(d)
+        geom = win.get_geometry()
+        x, y = geom.x + field_xy[0], geom.y + field_xy[1]
+        xtest.fake_input(d, X.MotionNotify, x=x, y=y)
+        xtest.fake_input(d, X.ButtonPress, 1); xtest.fake_input(d, X.ButtonRelease, 1)
+        d.sync(); time.sleep(0.1)
+        ctrl = d.keysym_to_keycode(XK.XK_Control_L)
+        a = d.keysym_to_keycode(XK.XK_a)
+        bs = d.keysym_to_keycode(XK.XK_BackSpace)
+        xtest.fake_input(d, X.KeyPress, ctrl)
+        xtest.fake_input(d, X.KeyPress, a); xtest.fake_input(d, X.KeyRelease, a)
+        xtest.fake_input(d, X.KeyRelease, ctrl)
+        xtest.fake_input(d, X.KeyPress, bs); xtest.fake_input(d, X.KeyRelease, bs)
+        d.sync()
+
+    def _tree_points(self, dump) -> dict:
+        """Click points from the app's own latest tree dump (widget centers,
+        window-relative): entries in order, plus the Compute button. The
+        dump is the surface's source of truth, so the driver follows the
+        real layout even when fonts or metrics shift it."""
+        points: dict[str, tuple[int, int]] = {}
+        if not dump: return points
+        entries: list[tuple[int, int]] = []
+        def walk(node):
+            cx = node.get("x", 0) + node.get("w", 0) // 2
+            cy = node.get("y", 0) + node.get("h", 0) // 2
+            if node.get("class") == "Entry": entries.append((cx, cy))
+            if node.get("class") == "Button" and node.get("text") == "Compute":
+                points["compute"] = (cx, cy)
+            for c in node.get("children", []): walk(c)
+        walk(dump["tree"])
+        if entries: points["payee"] = entries[0]
+        if len(entries) > 1: points["amount"] = entries[1]
+        return points
+
+    def _point_for(self, what: str) -> tuple[int, int]:
+        pts = self._tree_points(self._read_dump())
+        if what in pts: return pts[what]
+        return {"payee": self.PAYEE_FIELD, "amount": self.AMOUNT_FIELD,
+                "compute": self.COMPUTE_BTN}[what]
+
+    def _entry_values(self, dump) -> list[str]:
+        values: list[str] = []
+        def walk(node):
+            if node.get("class") == "Entry": values.append(node.get("value", ""))
+            for c in node.get("children", []): walk(c)
+        if dump: walk(dump["tree"])
+        return values
 
     def _click(self, xy: tuple[int, int]):
         from Xlib import X
@@ -123,13 +201,26 @@ class GuiSession:
     PAYEE_FIELD = (160, 45); AMOUNT_FIELD = (160, 95); COMPUTE_BTN = (160, 130)
 
     def type_field(self, field: str, text: str) -> int:
-        xy = self.PAYEE_FIELD if field == "payee" else self.AMOUNT_FIELD
         tool = self.store.append(self.branch, "tool_call",
                                  {"name": f"gui-type-{field}", "input": text, "output": ""})
         event = self.store.append(self.branch, "gui_input",
                                   {"action": "type", "field": field, "text": text, "tool": tool})
-        self._focus_and_type(xy, text)
-        self.keyframe(after_input=event, fresh=True)
+        idx = 0 if field == "payee" else 1
+        self._focus_and_type(self._point_for(field), text)
+        try:
+            self.keyframe(after_input=event, fresh=True)
+        except TimeoutError:
+            # The keystrokes either landed late (loaded machine) or missed
+            # the field (layout shifted under different fonts/metrics).
+            # Decide from the app's own tree: if the value is already right,
+            # keyframe from the latest dump; otherwise clear and retype once.
+            values = self._entry_values(self._read_dump())
+            if len(values) > idx and values[idx] == text:
+                self.keyframe(after_input=event)
+            else:
+                self._clear_field(self._point_for(field))
+                self._focus_and_type(self._point_for(field), text)
+                self.keyframe(after_input=event, fresh=True)
         return event
 
     def click_compute(self) -> int:
@@ -137,8 +228,15 @@ class GuiSession:
                                  {"name": "gui-click-compute", "input": "Compute", "output": ""})
         event = self.store.append(self.branch, "gui_input",
                                   {"action": "click", "target": "Compute", "tool": tool})
-        self._click(self.COMPUTE_BTN)
-        self.keyframe(after_input=event, fresh=True)
+        self._click(self._point_for("compute"))
+        try:
+            self.keyframe(after_input=event, fresh=True)
+        except TimeoutError:
+            # A landed click always produces a dump (compute dumps), so a
+            # timeout means the click missed; re-aim from the freshest
+            # tree and click once more. Recomputing is idempotent.
+            self._click(self._point_for("compute"))
+            self.keyframe(after_input=event, fresh=True)
         return event
 
     def state(self) -> dict:
