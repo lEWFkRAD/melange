@@ -15,9 +15,30 @@ def redact_text(value: str) -> str:
     return value
 
 def redact_bytes(value: bytes) -> bytes:
-    # Terminal text is decoded losslessly enough for UTF-8 fixtures; undecodable
-    # bytes remain representable and cannot turn a known secret into stored text.
-    return redact_text(value.decode("utf-8", "replace")).encode("utf-8")
+    return redact_text(value.decode("utf-8", "surrogateescape")).encode("utf-8", "surrogateescape")
+
+
+_LAST_TOKEN = re.compile(r"\S+\s*$")
+_ASSIGNMENT_PREFIX = re.compile(r"\b(?:token|api[_-]?key|password)\s*(?:[=:]\s*)?$", re.I)
+
+
+def split_redaction_buffer(value: bytes, *, final: bool = False) -> tuple[bytes, bytes]:
+    """Retain a possible credential suffix, rather than a fixed byte tail.
+
+    Assignment values have no maximum length. The released prefix still
+    needs redact_bytes before persistence. Hold the last token and any
+    preceding credential assignment until another token or EOF arrives.
+    """
+    if final:
+        return value, b""
+    text = value.decode("utf-8", "surrogateescape")
+    last = _LAST_TOKEN.search(text)
+    cut = last.start() if last else len(text)
+    assignment = _ASSIGNMENT_PREFIX.search(text[:cut])
+    if assignment:
+        cut = assignment.start()
+    boundary = len(text[:cut].encode("utf-8", "surrogateescape"))
+    return value[:boundary], value[boundary:]
 
 def contains_seeded_secret(value: bytes | str) -> bool:
     text = value.decode("utf-8", "replace") if isinstance(value, bytes) else value

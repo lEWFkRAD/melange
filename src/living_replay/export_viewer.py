@@ -8,7 +8,7 @@ in the side panel, and the branch list switches between the main line,
 forks, and ghost branches. No server, no external assets.
 """
 from __future__ import annotations
-import html, json
+import json
 from pathlib import Path
 
 from .replay import reconstruct
@@ -75,5 +75,8 @@ function draw(){
 scrub.oninput = () => { idx = +scrub.value; draw(); };
 draw();
 </script></body></html>"""
-    out = Path(out); out.write_text(page % payload.replace("</script>", "<\\/script>"), encoding="utf-8")
+    # HTML parses script end tags case-insensitively, including end tags
+    # with whitespace. Escape every '<' in the embedded JSON so recorded
+    # output and branch names can never become HTML/script markup.
+    out = Path(out); out.write_text(page % payload.replace("<", "\\u003c"), encoding="utf-8")
     return out

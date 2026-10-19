@@ -17,7 +17,17 @@ class TimelineStore:
     the wrong key raises crypto.TimelineKeyError (fails closed).
     """
     def __init__(self, root: str | Path, key_provider=None):
-        self.root = Path(root); self.root.mkdir(parents=True, exist_ok=True)
+        self.root = Path(root)
+        has_key = (self.root / "key.json").exists()
+        if has_key and key_provider is None:
+            from .crypto import TimelineKeyError
+            raise TimelineKeyError("encrypted timeline requires a key provider")
+        if key_provider is not None and not has_key and (
+                (self.root / "timeline.sqlite").exists() or
+                ((self.root / "objects").exists() and any((self.root / "objects").iterdir()))):
+            from .crypto import TimelineKeyError
+            raise TimelineKeyError("cannot enable encryption on an existing unencrypted timeline")
+        self.root.mkdir(parents=True, exist_ok=True)
         self.blobs = self.root / "objects"; self.blobs.mkdir(exist_ok=True)
         self.crypto = None
         if key_provider is not None:
