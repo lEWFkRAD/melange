@@ -3,10 +3,27 @@
 Where the project stands and what is open. Updated 2026-10-19, when the
 repository went public.
 
+## The north star
+
+Melange is a universal video codec for computation. The destination is
+ordinary software in ordinary hands: an accountant working in QuickBooks
+or Sage 50 should see the same screens, the same functions, the same
+vendor product she has always used. The codec adds one simple layer: the
+work becomes a video she can rewind and fast-forward, and clicking a
+number in that video lets her change it and watch the rest of the work
+redo itself.
+
+Agent sessions are the proving ground where the mechanics are being
+built and measured, because they are the hardest sessions to fake. The
+codec itself is software-agnostic: traces enter at a labeled fidelity
+(native, structure, or screen-only), and every branch renders back out
+to plain video.
+
 ## Where it stands
 
-The engine is built and verified. Builds 1 through 3 landed in one
-unified tree:
+The engine is built and verified (proven on agent sessions and synthetic
+surfaces; existing vendor software is the M9 rung below). Builds 1
+through 3 landed in one unified tree:
 
 - **Capture and replay.** A PTY tap records terminal sessions into an
   append-only, hash-chained timeline. A deterministic grid reconstructs
@@ -38,9 +55,14 @@ Full test suite: 175 tests passing (3 skipped, environment-gated).
 
 Today the desktop surface is served by an instrumented synthetic app.
 The next fidelity rung is capturing a real desktop application through
-its accessibility tree, per `docs/desktop-profile.md`. This needs a
-desktop app that exposes a debug or accessibility endpoint to record
-against. Help wanted: capture drivers, tree differencing, corpora.
+its accessibility tree, per `docs/desktop-profile.md`. This is the rung
+that reaches existing vendor software: the application stays exactly as
+its vendor shipped it, the codec reads its structure from the
+accessibility tree, and an edit replays as changed inputs into the real
+app from the fork point, so the vendor software itself produces the new
+outcome. This needs a desktop app that exposes a debug or accessibility
+endpoint to record against. Help wanted: capture drivers, tree
+differencing, corpora.
 
 ### The live surface
 
