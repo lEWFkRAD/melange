@@ -37,11 +37,16 @@ class GuiGate(unittest.TestCase):
         recon = gui_reconstruct(self.store, "main")
         flat_recon = flatten_tree(recon["tree"])
         nodes = matched = 0
+        diffs = []
         for path, node in live_final.items():
             nodes += 1
             r = flat_recon.get(path)
             if r and all(r.get(k) == node.get(k) for k in ("class", "value", "text")):
                 matched += 1
+            else:
+                diffs.append({k: (node.get(k), r.get(k) if r else None)
+                              for k in ("class", "value", "text")
+                              if not r or r.get(k) != node.get(k)})
         rate = matched / nodes
         self.assertIn("total=42", json.dumps(live_final))
         self.assertEqual(recon["after_input"], self.store.events("main")[-2]["id"]
@@ -66,7 +71,8 @@ class GuiGate(unittest.TestCase):
         print(f"\nB3-G4 measured: GUI reconstruction matched the live widget tree on "
               f"{matched}/{nodes} nodes ({rate:.2%}); fork from checkpoint with note "
               "amount=50 completed at total=100 on the ghost branch; original untouched")
-        self.assertGreaterEqual(rate, 0.995)
+        if diffs: print(f"B3-G4 node diffs (live vs reconstructed): {diffs}")
+        self.assertGreaterEqual(rate, 0.995, f"mismatched nodes: {diffs}")
 
 if __name__ == "__main__":
     unittest.main()
