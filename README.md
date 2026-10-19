@@ -41,14 +41,14 @@ see [LICENSE](LICENSE).
 PYTHONPATH=src python3 -m unittest discover -s tests
 ```
 
-**66 tests: 65 passed, 0 failed, 1 skipped** — measured 2026-10-17 on this
-VM (Linux, Python 3.12.3) in a venv with all declared extras installed
-(`pyte`, `z3-solver`, `python-xlib`, `cryptography`; tmux and Xvfb present
-on the host). The single skip is `tests/test_sandbox.py`, the Firecracker
-integration test, which runs only on a sandbox host with `LR_SANDBOX_DIR`
-set. Quote this count with its environment; the older "60 tests" figure
-came from a subset tree in a different environment and is retired.
-Smoke check: all 24 package modules import cleanly.
+**215 tests: 199 passed, 0 failed, 16 skipped** — measured 2026-10-19 on
+WSL Ubuntu, Python 3.12.3, with pyte, Z3, cryptography, python-xlib, Tk,
+tmux and Xvfb. The skips require external workbook/store fixtures or the
+Firecracker sandbox (`LR_SANDBOX_DIR`). The GUI gate ran and passed.
+Historical gate measurements below retain their dates and environments.
+See [the review report](docs/code-review-2026-10-19.md) for before/after
+results and [M9 desktop capture](docs/m9-desktop-capture.md) for the new
+recorder and its real-browser verification.
 
 **Melange** (formerly Living Replay) records computation the way a video codec records a scene — keyframes are snapshots, deltas are logged actions, playback is resumption — except the recording stays executable: rewind to the layer where a decision was made, insert an adjustment, and the session runs forward again on a fork. The pinned timeline is the **Golden Path**.
 

@@ -30,6 +30,7 @@ does not check out is recorded as unverified and buys nothing.
 from __future__ import annotations
 
 import json
+import math
 
 FIDELITY_CAPS = {
     "native": {"scrub", "dive", "annotate", "provenance", "clamp", "fork"},
@@ -82,45 +83,121 @@ def flatten_ax(nodes: list) -> dict:
     Paths are built from childIds linkage (roots are nodes no other
     node lists as a child), matching the recorder's keying exactly.
     """
-    by_id = {n["nodeId"]: n for n in nodes}
+    if not isinstance(nodes, list) or not nodes:
+        raise ValueError("AX tree must be a non-empty node list")
+    by_id = {}
+    for n in nodes:
+        if not isinstance(n, dict) or not isinstance(n.get("nodeId"), str):
+            raise ValueError("AX node must have a string nodeId")
+        if n["nodeId"] in by_id and by_id[n["nodeId"]] != n:
+            raise ValueError("conflicting duplicate AX nodeId")
+        by_id[n["nodeId"]] = n
+    # CDP can repeat an identical node in a full-tree response (the
+    # original desktop corpus has one). Collapse only exact repeats.
+    nodes = list(by_id.values())
     child_of = set()
     for n in nodes:
-        child_of.update(n.get("childIds") or [])
+        children = n.get("childIds") or []
+        if not isinstance(children, list):
+            raise ValueError("AX childIds must be a list")
+        for child in children:
+            if not isinstance(child, str) or child not in by_id:
+                raise ValueError("AX tree contains a missing child")
+            if child in child_of:
+                raise ValueError("AX node has multiple parents")
+            child_of.add(child)
     roots = [n for n in nodes if n["nodeId"] not in child_of]
     flat = {}
-
-    def walk(node, path):
+    visited = set()
+    pending = [(root, str(i)) for i, root in reversed(list(enumerate(roots)))]
+    while pending:
+        node, path = pending.pop()
+        if node["nodeId"] in visited:
+            raise ValueError("AX tree contains a cycle")
+        visited.add(node["nodeId"])
         flat[path] = _slim(node)
-        for idx, cid in enumerate(node.get("childIds") or []):
-            child = by_id.get(cid)
-            if child is not None:
-                walk(child, f"{path}/{idx}")
-
-    for i, root in enumerate(roots):
-        walk(root, str(i))
+        pending.extend((by_id[cid], f"{path}/{idx}") for idx, cid in
+                       reversed(list(enumerate(node.get("childIds") or []))))
+    if len(visited) != len(nodes):
+        raise ValueError("AX tree contains a cycle")
     return flat
 
 
 def ingest_desktop_record(store, branch: str, jsonl_text: str,
                           source: str = "cdp-ax") -> dict:
-    """Import a desktop recorder JSONL (keyframe/delta/input lines)."""
+    """Import a validated desktop record into a fresh structure branch.
+
+    New records use elapsed seconds in ``ts``; the original spike used
+    milliseconds in ``t``. Untimed legacy records remain supported.
+    Validate the entire record before writing any events or objects.
+    """
     lines = [json.loads(l) for l in jsonl_text.strip().split("\n") if l.strip()]
-    store.append(branch, "ingest_profile",
-                 {"source": source, "fidelity": "structure"})
-    counts = {"keyframes": 0, "deltas": 0, "delta_ops": 0, "inputs": 0}
+    if not lines or not isinstance(lines[0], dict) or lines[0].get("type") != "keyframe":
+        raise ValueError("desktop record must start with an AX keyframe")
+    if store.events(branch):
+        raise ValueError("desktop ingest requires a new branch")
+    previous_ts = 0
+    stamps = []
     for ev in lines:
+        if not isinstance(ev, dict):
+            raise ValueError("desktop record events must be objects")
+        ts = ev.get("ts", ev.get("t"))
+        if ts is not None:
+            if (isinstance(ts, bool) or not isinstance(ts, (int, float))
+                    or not math.isfinite(ts) or ts < 0):
+                raise ValueError("desktop timestamp must be finite and nonnegative")
+            if "ts" not in ev:
+                ts /= 1000
+            if ts < previous_ts:
+                raise ValueError("desktop timestamps must be monotonic")
+            previous_ts = ts
+        # Untimed legacy frames retain ordering at the most recent time.
+        if previous_ts > (2**63 - 1) / 1_000_000_000:
+            raise ValueError("desktop timestamp exceeds the ledger clock range")
+        stamp = round(previous_ts * 1_000_000_000)
+        if stamp > 2**63 - 1:
+            raise ValueError("desktop timestamp exceeds the ledger clock range")
+        stamps.append(stamp)
+        kind = ev.get("type")
+        if kind == "keyframe":
+            flatten_ax(ev.get("nodes"))
+        elif kind == "delta":
+            if not isinstance(ev.get("ops"), list):
+                raise ValueError("desktop delta ops must be a list")
+            for op in ev["ops"]:
+                if (not isinstance(op, dict) or op.get("op") not in {"set", "del"}
+                        or not isinstance(op.get("path"), str)
+                        or not op["path"]
+                        or any(not p.isdecimal() for p in op["path"].split("/"))):
+                    raise ValueError("invalid desktop delta operation")
+                if op["op"] == "set" and not isinstance(op.get("node"), dict):
+                    raise ValueError("desktop set operation requires a node")
+        elif kind == "input":
+            if not isinstance(ev.get("events", []), list):
+                raise ValueError("desktop input events must be a list")
+            if not isinstance(ev.get("synthetic", False), bool):
+                raise ValueError("desktop input synthetic label must be boolean")
+        else:
+            raise ValueError(f"unknown desktop record type: {kind!r}")
+    store.append(branch, "ingest_profile",
+                 {"source": source, "fidelity": "structure", "format": "cdp-ax"},
+                 mono_ns=stamps[0])
+    counts = {"keyframes": 0, "deltas": 0, "delta_ops": 0, "inputs": 0}
+    for ev, stamp in zip(lines, stamps):
+        timing = {"ts": stamp / 1_000_000_000}
         if ev["type"] == "keyframe":
             digest = store.put_blob(json.dumps(ev["nodes"]).encode())
-            store.append(branch, "ax_keyframe", {"blob": digest})
+            store.append(branch, "ax_keyframe", {"blob": digest, **timing}, mono_ns=stamp)
             counts["keyframes"] += 1
         elif ev["type"] == "delta":
-            store.append(branch, "ax_delta", {"ops": ev["ops"], "poll": ev.get("poll")})
+            store.append(branch, "ax_delta", {"ops": ev["ops"], "poll": ev.get("poll"),
+                                               **timing}, mono_ns=stamp)
             counts["deltas"] += 1
             counts["delta_ops"] += len(ev["ops"])
         elif ev["type"] == "input":
             store.append(branch, "input_event",
                          {"synthetic": ev.get("synthetic", False),
-                          "events": ev.get("events", [])})
+                          "events": ev.get("events", []), **timing}, mono_ns=stamp)
             counts["inputs"] += 1
     return counts
 

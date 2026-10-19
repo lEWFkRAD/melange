@@ -47,30 +47,38 @@ through 3 landed in one unified tree:
 - **Static export.** The flagship example (a synthetic tax return) is
   baked for static hosting in `surface-export/`.
 
-Full test suite: 175 tests passing (3 skipped, environment-gated).
+Full test suite measured 2026-10-19 on WSL/Python 3.12.3: 215 tests ran,
+199 passed and 16 skipped for external artifacts or Firecracker. See the
+README and `docs/code-review-2026-10-19.md` for the environment and gates.
 
 ## Open work
 
 ### M9: real-desktop structure capture
 
-Today the desktop surface is served by an instrumented synthetic app.
-The next fidelity rung is capturing a real desktop application through
-its accessibility tree, per `docs/desktop-profile.md`. This is the rung
-that reaches existing vendor software: the application stays exactly as
-its vendor shipped it, the codec reads its structure from the
-accessibility tree, and an edit replays as changed inputs into the real
-app from the fork point, so the vendor software itself produces the new
-outcome. This needs a desktop app that exposes a debug or accessibility
-endpoint to record against. Help wanted: capture drivers, tree
-differencing, corpora.
+The reusable Chromium/Electron CDP recorder now lives in
+`living_replay.desktop`. It captures a selected application's accessibility
+tree and structural deltas without changing the application, preserves
+recorded timing, and feeds the live service's structure viewer. See
+`docs/m9-desktop-capture.md` for setup and forward verification against
+a real browser with synthetic content.
+
+This completes the **structure capture and replay** rung. These recordings
+support scrub, inspect and annotate; they refuse clamp, fork and causal
+provenance because an accessibility tree is not an executable checkpoint.
+
+Next: an application-specific checkpoint/input adapter that can replay
+changed inputs into the actual vendor application and verify its result.
+Windows UI Automation drivers, cross-origin frame coverage and synthetic
+corpora for QuickBooks/Sage remain open. No vendor-app editing claim is
+made by the CDP recorder.
 
 ### The live surface
 
-The web surface a visitor can open today is a baked export. Actions
-such as clamp and explain render as locked because they need the live
-service. Wiring the surface to the service API, with the baked export
-kept as the no-server demo, is open work. Help wanted: frontend,
-service API polish, auth story for shared hosting.
+The public static surface is a baked export. Actions such as clamp and
+explain render as locked because they need the live service. The local
+`service/static/` surface already calls the service API; `service/run.sh`
+serves it. Open work is shared-hosting authentication, service API polish
+and frontend usability. The baked export remains the no-server demo.
 
 ### PANDA rung 4: opaque-binary taint
 

@@ -9,6 +9,7 @@ test = ["pyte>=0.8"]
 solver = ["z3-solver"]
 crypto = ["cryptography"]
 gui = ["python-xlib"]
+desktop = ["websocket-client>=1.6,<2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

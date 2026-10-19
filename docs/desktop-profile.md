@@ -5,6 +5,10 @@ ONY-169 Door 2). This profile covers GUI applications the way the
 terminal profile covers consoles: a structured record of the interface,
 reconstructable frame by frame, honest about what it is not.
 
+The reusable M9 recorder and synthetic browser verification are documented
+in [m9-desktop-capture.md](m9-desktop-capture.md). The measurements below
+describe the historical spike, not newly generated synthetic fixtures.
+
 ## Capture
 
 - Target: an Electron/Chromium application relaunched with
