@@ -121,10 +121,17 @@ def load_registry() -> StoreRegistry:
 
 # ------------------------------------------------------------ step model
 
+def generic_branch(store, branch: str) -> bool:
+    """Whether the recording uses the generic JSONL ingest contract."""
+    return any(e["kind"] == "ingest_profile"
+               and e["payload"].get("format") == ingest.GENERIC_FORMAT
+               for e in store.replay_events(branch))
+
+
 def branch_kind(store, branch: str) -> str:
     fidelity = ingest.branch_fidelity(store, branch)
     if fidelity == "screen-only":
-        return "video"
+        return "session" if generic_branch(store, branch) else "video"
     kinds = {e["kind"] for e in store.replay_events(branch)}
     if "cell_frame" in kinds:
         return "workbook"
@@ -141,6 +148,8 @@ def step_events(store, branch: str):
         events = [e for e in events if e["kind"] == "screen_frame"]
     elif kind == "workbook":
         events = [e for e in events if e["kind"] == "cell_frame"]
+    elif kind == "structure" or generic_branch(store, branch):
+        events = [e for e in events if e["kind"] != "ingest_profile"]
     return kind, events
 
 
@@ -547,10 +556,26 @@ class Handler(BaseHTTPRequestHandler):
                 "event_id": ev["id"], "label": ev["payload"].get("label"),
                 "values": ev["payload"]["values"]})
         if kind == "structure":
+            if generic_branch(store, branch):
+                has_state = any(e["payload"].get("state_blob")
+                                for e in store.events(branch, through=ev["id"]))
+                parts = (ingest.generic_state_at(store, branch, through=ev["id"])
+                         if has_state else None)
+            else:
+                parts = bridge.parts_at(store, branch, through=ev["id"])
             return self._json(200, {
                 "kind": kind, "step": n, "of": len(steps),
                 "event_id": ev["id"], "event_kind": ev["kind"],
-                "parts": bridge.parts_at(store, branch, through=ev["id"])})
+                "ts": ev["payload"].get("ts", ev["mono_ns"] / 1_000_000_000),
+                "parts": parts, "state_available": parts is not None,
+                "payload": ev["payload"]})
+        if generic_branch(store, branch):
+            return self._json(200, {
+                "kind": kind, "step": n, "of": len(steps),
+                "event_id": ev["id"], "event_kind": ev["kind"],
+                "ts": ev["payload"].get("ts", ev["mono_ns"] / 1_000_000_000),
+                "screen": json.dumps(ev["payload"], ensure_ascii=False, indent=2),
+                "payload": ev["payload"]})
         return self._json(200, {
             "kind": kind, "step": n, "of": len(steps),
             "event_id": ev["id"], "event_kind": ev["kind"],
