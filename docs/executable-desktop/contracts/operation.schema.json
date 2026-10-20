@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:melange:design:operation:1.0",
+  "title": "Proposed executable desktop operation v1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "operation_id", "kind", "state", "revision", "recording_id", "session_id", "branch", "phase", "cancel_requested", "result", "error"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "operation_id": {"type": "string", "format": "uuid"},
+    "kind": {"enum": ["start", "checkpoint", "stop_recording", "fork_restore", "restore", "continue", "input"]},
+    "state": {"enum": ["queued", "running", "completed", "failed", "canceled"]},
+    "revision": {"type": "integer", "minimum": 1},
+    "recording_id": {"type": "string", "format": "uuid"},
+    "session_id": {"type": ["string", "null"], "format": "uuid"},
+    "branch": {"type": ["string", "null"], "minLength": 1},
+    "phase": {"type": "string", "minLength": 1},
+    "cancel_requested": {"type": "boolean"},
+    "result": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object", "additionalProperties": false, "minProperties": 1,
+          "properties": {
+            "session_id": {"type": "string", "format": "uuid"},
+            "runtime_id": {"type": "string", "format": "uuid"},
+            "checkpoint_id": {"type": "string", "format": "uuid"},
+            "child_branch": {"type": "string", "minLength": 1},
+            "input_id": {"type": "string", "format": "uuid"},
+            "live_frame_path": {"type": "string", "pattern": "^/api/runtime/v1/sessions/[0-9a-f-]+/frames$"},
+            "verification_receipt_id": {"type": "string", "format": "uuid"},
+            "anchor": {
+              "type": "object", "additionalProperties": false,
+              "required": ["branch", "event_id", "event_hash"],
+              "properties": {
+                "branch": {"type": "string", "minLength": 1},
+                "event_id": {"type": "integer", "minimum": 1},
+                "event_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "error": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["code", "message", "retryable"],
+          "properties": {
+            "code": {"type": "string", "minLength": 1},
+            "message": {"type": "string", "minLength": 1},
+            "retryable": {"type": "boolean"}
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"state": {"const": "completed"}}},
+      "then": {"properties": {"result": {"type": "object"}, "error": {"type": "null"}}}
+    },
+    {
+      "if": {"properties": {"state": {"const": "failed"}}},
+      "then": {"properties": {"result": {"type": "null"}, "error": {"type": "object"}}}
+    },
+    {
+      "if": {"properties": {"state": {"enum": ["queued", "running", "canceled"]}}},
+      "then": {"properties": {"result": {"type": "null"}, "error": {"type": "null"}}}
+    }
+  ]
+}

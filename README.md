@@ -40,6 +40,12 @@ forward-execution verification), and [ROADMAP.md](ROADMAP.md) for the open
 work, including pieces sized for a first contribution. Licensed under MIT;
 see [LICENSE](LICENSE).
 
+The next milestone has a concrete [executable desktop system map](docs/executable-desktop/README.md),
+[technical design](docs/executable-desktop/technical-design.md), and
+[implementation gates](docs/executable-desktop/implementation-plan.md).
+These are proposed contracts for recording and restoring ordinary desktop work;
+they do not claim that a universal desktop runtime is already implemented.
+
 ## Tests — the canonical count
 
 ```
