@@ -1,0 +1,8 @@
+{
+  "source": "OpenAI built-in imagegen",
+  "kind": "Concept illustration",
+  "sha256": "c92bee2bebbc51c22df8bb63468a24b6ed4272a7ffe85353a58d6f6db8c98408",
+  "prompts": [
+    "Use case: ads-marketing.\nAsset type: finished wide 2:1 GitHub/project website hero banner, 2048x1024 if possible, opaque background.\nCreate a premium editorial illustration for \"Melange\", a recording of computational work that can be replayed, inspected, and tried differently while preserving its Original. A dark brass recording desk, halfway between a film editing bench and a precision scientific instrument: an illuminated cyan sequence of tangible frame cards passes through a viewing lens, then a clearly visible junction creates a second short sequence while the original sequence stays intact on its own shelf. Two small elegant printed labels read exactly \"Original\" and \"What-if\". No success/failure results, no code, no numbers. This is conceptual artwork, explicitly not an app screenshot or a claim of universal reversible computation.\nRich near-black and deep midnight background, aged brass controls, warm ivory paper, crisp restrained cyan light, subtle analog grain. Carefully composed cinematic studio light, impressive but calm, precision detailing, generous negative space. Distinctive editorial craftsmanship rather than generic futuristic technology art.\nIntegrate the large exact title \"MELANGE\" in outstanding clear ivory typography, prominent and readable at thumbnail size. The only words in the whole image are \"MELANGE\", \"Original\", and \"What-if\". Wide 2:1 safe composition, no border, no watermark, no logos, no private information or screenshots."
+  ]
+}

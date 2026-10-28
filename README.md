@@ -1,3 +1,12 @@
+<!-- project-home:start -->
+![Melange concept banner](site/hero.png)
+
+**[Melange project homepage](https://lewfkrad.github.io/melange/)** · [Documentation](https://github.com/lEWFkRAD/melange/blob/main/service/README.md)
+
+Record computational work, inspect its history, and try bounded What-if runs while preserving the Original.
+
+<!-- project-home:end -->
+
 # Melange — canonical tree
 
 > **This is the canonical Melange repository** (unified 2026-10-17, M1 prep).
