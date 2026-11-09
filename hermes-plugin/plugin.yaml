@@ -1,0 +1,19 @@
+name: melange
+version: "0.1.0"
+description: >
+  Melange: a video codec for computation. Record terminal sessions as
+  rewindable timelines, scrub to any step, fork What-ifs, clamp a recorded
+  input and watch its dependents recompute, and ask what went wrong.
+author: lEWFkRAD
+requires_hermes: ">=0.23"
+provides_tools:
+  - melange_record
+  - melange_versions
+  - melange_screen
+  - melange_where_from
+  - melange_note
+  - melange_whatif
+  - melange_clamp
+  - melange_explain
+  - melange_shelf
+  - melange_demo
