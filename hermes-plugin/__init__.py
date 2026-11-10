@@ -186,15 +186,24 @@ def melange_shelf(params):
 def melange_demo(params):
     """Run the bundled flagship demo: a synthetic return, corrected, end to end."""
     try:
+        import shutil
         import tempfile
         from living_replay import flagship
+        kept = _home() / "demo"
         with tempfile.TemporaryDirectory(prefix="melange-demo-") as td:
             facts = flagship.run_flagship(Path(td),
                                           corrected_wages=float(params.get("corrected_wages", 48000)))
+            # Keep the demo's timeline as recording "demo" so the other tools
+            # (clamp, explain, versions, screen) have a computation to work on.
+            shutil.rmtree(kept, ignore_errors=True)
+            kept.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(Path(td) / "timeline", kept)
         return _ok(
+            recording="demo",
             original_figures=facts["figures"],
             amended_figures=facts["amended_figures"],
-            note="wages corrected; only the wages chain recomputed; the Original is untouched")
+            note="wages corrected; only the wages chain recomputed; the Original is untouched. "
+                 "Kept as recording 'demo' (version 'main'): melange_clamp and melange_explain work on it.")
     except Exception as e:
         return _err(e)
 
@@ -281,7 +290,7 @@ TOOLS = [
      melange_shelf),
     ("melange_demo",
      _schema("melange_demo",
-             "Run the bundled flagship demo end to end: a synthetic tax return is computed, one input is corrected, only its dependents recompute, and the Original stays byte-identical. No arguments needed.",
+             "Run the bundled flagship demo end to end: a synthetic tax return is computed, one input is corrected, only its dependents recompute, and the Original stays byte-identical. The result is kept as recording 'demo' for melange_clamp and melange_explain. No arguments needed.",
              {"corrected_wages": {"type": "number", "description": "Corrected wages for the What-if (default 48000)"}}, []),
      melange_demo),
 ]

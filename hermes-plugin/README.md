@@ -13,7 +13,8 @@ past honestly:
 - `melange_clamp` — change one recorded input; only its dependents recompute
 - `melange_explain` — what went wrong? forward-verified candidate causes
 - `melange_shelf` — keep or release a What-if
-- `melange_demo` — the bundled flagship: a synthetic return, corrected end to end
+- `melange_demo` — the bundled flagship: a synthetic return, corrected end to end,
+  kept as recording `demo` so you can clamp and explain it yourself
 
 All processing is local and stdlib-only. No network calls. Recordings
 live under `~/.hermes/plugins-data/melange/`. Capture-side redaction
