@@ -30,6 +30,14 @@ from living_replay.ingest import FidelityError  # noqa: E402
 from living_replay.store import TimelineStore  # noqa: E402
 
 
+MIN_TIMEOUT = 0.1
+MAX_TIMEOUT = 300.0
+MIN_ROWS = 1
+MAX_ROWS = 200
+MIN_COLS = 1
+MAX_COLS = 500
+
+
 def _home() -> Path:
     try:
         from hermes_constants import get_hermes_home
@@ -54,19 +62,35 @@ def _err(msg):
     return json.dumps({"success": False, "error": str(msg)})
 
 
+def _bounded(params, name, default, cast, minimum, maximum):
+    value = cast(params.get(name, default))
+    if value < minimum or value > maximum:
+        raise ValueError(f"{name} must be between {minimum:g} and {maximum:g}")
+    return value
+
+
+def _approve_recording(tool_name: str = "", args=None, **_kwargs):
+    """Route every model-requested recording through Hermes's owner approval gate."""
+    if tool_name != "melange_record":
+        return None
+    command = args.get("command", "") if isinstance(args, dict) else ""
+    return {"action": "approve", "message": command if isinstance(command, str) else repr(command)}
+
+
 # ------------------------------------------------------------------ tools
 
 def melange_record(params):
     """Run a command in a PTY and record it onto a recording's timeline."""
     try:
-        store = _store(params)
         command = params.get("command")
-        if not command:
-            return _err("command is required")
-        cap = PtyCapture(store, rows=int(params.get("rows", 24)),
-                        cols=int(params.get("cols", 80)))
-        cap.run(command if isinstance(command, list) else ["/bin/sh", "-lc", command],
-                timeout=float(params.get("timeout", 30)))
+        if not isinstance(command, str) or not command:
+            return _err("command must be a non-empty string")
+        rows = _bounded(params, "rows", 24, int, MIN_ROWS, MAX_ROWS)
+        cols = _bounded(params, "cols", 80, int, MIN_COLS, MAX_COLS)
+        timeout = _bounded(params, "timeout", 30, float, MIN_TIMEOUT, MAX_TIMEOUT)
+        store = _store(params)
+        cap = PtyCapture(store, rows=rows, cols=cols)
+        cap.run(["/bin/sh", "-lc", command], timeout=timeout)
         return _ok(recording=str(store.root.name),
                    steps=len(store.events("main")),
                    screen=cap.grid.screen())
@@ -239,8 +263,12 @@ TOOLS = [
      _schema("melange_record",
              "Run a shell command in a PTY and record it as a rewindable Melange timeline. Returns the final screen.",
              {"command": {"type": "string", "description": "Shell command to run and record"},
-              "recording": _REC, "rows": {"type": "integer"}, "cols": {"type": "integer"},
-              "timeout": {"type": "number", "description": "Seconds before the command is cut off (default 30)"}},
+              "recording": _REC,
+              "rows": {"type": "integer", "minimum": MIN_ROWS, "maximum": MAX_ROWS, "default": 24},
+              "cols": {"type": "integer", "minimum": MIN_COLS, "maximum": MAX_COLS, "default": 80},
+              "timeout": {"type": "number", "minimum": MIN_TIMEOUT, "maximum": MAX_TIMEOUT,
+                          "default": 30,
+                          "description": "Seconds before the command is cut off (default 30, maximum 300)"}},
              ["command"]),
      melange_record),
     ("melange_versions",
@@ -315,6 +343,7 @@ TOOLS = [
 
 
 def register(ctx):
+    ctx.register_hook("pre_tool_call", _approve_recording)
     for name, schema, handler in TOOLS:
         ctx.register_tool(name=name, toolset="melange", schema=schema,
                           handler=lambda params, _h=handler, **kw: _h(params))

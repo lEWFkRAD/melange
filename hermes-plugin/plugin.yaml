@@ -6,6 +6,8 @@ description: >
   input and watch its dependents recompute, and ask what went wrong.
 author: lEWFkRAD
 requires_hermes: ">=0.23"
+provides_hooks:
+  - pre_tool_call
 provides_tools:
   - melange_record
   - melange_versions
