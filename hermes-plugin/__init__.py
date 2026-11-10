@@ -17,8 +17,10 @@ import os
 import sys
 from pathlib import Path
 
-# The Melange library lives one level up in this repo (src/living_replay).
-_LIB = Path(__file__).resolve().parent.parent / "src"
+# The engine modules the plugin needs are bundled beside it (living_replay/),
+# because `hermes plugins install` copies only this directory. They are kept in
+# step with src/living_replay by tools/sync_hermes_plugin.py.
+_LIB = Path(__file__).resolve().parent
 if str(_LIB) not in sys.path:
     sys.path.insert(0, str(_LIB))
 
