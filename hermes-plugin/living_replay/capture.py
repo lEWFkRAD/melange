@@ -4,6 +4,23 @@ from .grid import Grid
 from .redaction import redact_bytes, split_redaction_buffer
 from .store import TimelineStore
 
+
+_CHILD_ENV_DEFAULTS = {
+    "PATH": os.defpath,
+    "HOME": os.path.expanduser("~"),
+    "LANG": "C.UTF-8",
+    "TERM": "xterm-256color",
+}
+
+
+def _child_env() -> dict[str, str]:
+    """Return the terminal basics without leaking the agent's provider secrets."""
+    return {
+        name: os.environ.get(name) or default
+        for name, default in _CHILD_ENV_DEFAULTS.items()
+    }
+
+
 class PtyCapture:
     """Owns the PTY; reads raw output with monotonic timestamps and byte offsets."""
     def __init__(self, store: TimelineStore, branch="main", rows=24, cols=80, keyframe_every=1, grid: Grid | None=None, offset=0):
@@ -21,7 +38,7 @@ class PtyCapture:
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", self.grid.rows, self.grid.cols, 0, 0))
         try:
             proc=subprocess.Popen(argv,stdin=slave,stdout=slave,stderr=slave,close_fds=True,
-                                  start_new_session=True)
+                                  start_new_session=True,env=_child_env())
         except BaseException:
             os.close(master)
             raise

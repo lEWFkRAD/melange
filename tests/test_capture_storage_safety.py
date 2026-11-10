@@ -1,11 +1,13 @@
 """Capture and encrypted workspace regressions; synthetic data only."""
 import io
+import os
 import subprocess
 import sys
 import tarfile
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from living_replay.capture import PtyCapture
@@ -95,6 +97,27 @@ class CaptureStorageSafetyTests(unittest.TestCase):
         with self.assertRaises(subprocess.TimeoutExpired):
             PtyCapture(store).run([sys.executable, "-c", code], timeout=0.15)
         self.assertLess(time.monotonic() - start, 1.5)
+
+    def test_child_receives_only_the_terminal_environment(self):
+        store = self.store()
+        allowed = {
+            "PATH": "/usr/bin:/bin",
+            "HOME": str(self.root),
+            "LANG": "C.UTF-8",
+            "TERM": "xterm-256color",
+        }
+        inherited_secret = "synthetic-provider-secret"
+        with mock.patch.dict(
+            os.environ,
+            {**allowed, "MELANGE_TEST_PROVIDER_KEY": inherited_secret},
+            clear=True,
+        ):
+            capture = PtyCapture(store)
+            self.assertEqual(capture.run(["/usr/bin/env"]), 0)
+
+        child_env = self.terminal_bytes(store).decode("utf-8").replace("\r", "")
+        self.assertEqual(set(child_env.splitlines()), {f"{key}={value}" for key, value in allowed.items()})
+        self.assertNotIn(inherited_secret, child_env)
 
     def test_encrypted_store_rejects_missing_key_without_mutation(self):
         key = LocalKeyProvider(LocalKeyProvider.generate())
