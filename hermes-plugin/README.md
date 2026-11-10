@@ -15,6 +15,8 @@ past honestly:
 - `melange_shelf` — keep or release a What-if
 - `melange_demo` — the bundled flagship: a synthetic return, corrected end to end,
   kept as recording `demo` so you can clamp and explain it yourself
+  (`demo: "coding"` runs a second one: a retry helper whose real tests fail
+  1 of 6, kept as recording `coding` so you can clamp `/retryBudget`)
 
 All processing is local and stdlib-only. No network calls. Recordings
 live under `~/.hermes/plugins-data/melange/`. Capture-side redaction

@@ -189,6 +189,22 @@ def melange_demo(params):
         import shutil
         import tempfile
         from living_replay import flagship
+        if params.get("demo", "tax") == "coding":
+            from living_replay import coding_demo
+            kept = _home() / "coding"
+            with tempfile.TemporaryDirectory(prefix="melange-demo-") as td:
+                report = coding_demo.run_demo(Path(td))
+                shutil.rmtree(kept, ignore_errors=True)
+                kept.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(Path(td) / "timeline", kept)
+            return _ok(
+                recording="coding",
+                inputs=report["inputs"],
+                figures=report["figures"],
+                test_output=report["execution"]["output"],
+                note="a retry helper with a budget of 2 fails 1 of its 6 real tests. Kept as recording "
+                     "'coding' (version 'main'): melange_clamp target '/retryBudget' re-runs the tests "
+                     "in a What-if and leaves the Original untouched.")
         kept = _home() / "demo"
         with tempfile.TemporaryDirectory(prefix="melange-demo-") as td:
             facts = flagship.run_flagship(Path(td),
@@ -291,7 +307,9 @@ TOOLS = [
     ("melange_demo",
      _schema("melange_demo",
              "Run the bundled flagship demo end to end: a synthetic tax return is computed, one input is corrected, only its dependents recompute, and the Original stays byte-identical. The result is kept as recording 'demo' for melange_clamp and melange_explain. No arguments needed.",
-             {"corrected_wages": {"type": "number", "description": "Corrected wages for the What-if (default 48000)"}}, []),
+             {"demo": {"type": "string", "enum": ["tax", "coding"],
+                       "description": "'tax' (default): the synthetic return. 'coding': a retry helper whose real test suite fails 1 of 6, kept as recording 'coding' for melange_clamp on '/retryBudget'"},
+              "corrected_wages": {"type": "number", "description": "Tax demo only: corrected wages for the What-if (default 48000)"}}, []),
      melange_demo),
 ]
 
