@@ -75,6 +75,13 @@ provide vendor-app editing.
 
 ### Next acceptance milestone: a real desktop you can continue
 
+Start with the [system map](docs/executable-desktop/README.md), then the
+[technical design](docs/executable-desktop/technical-design.md) and
+[ordered implementation gates](docs/executable-desktop/implementation-plan.md).
+These proposed contracts include checkpoint manifests, operation schemas,
+failure recovery and exact acceptance evidence. The first implementation PR
+qualifies a complete desktop snapshot before exposing continuation controls.
+
 The next deliverable is one unmodified editor, terminal and browser running
 inside a managed desktop environment, controlled through the normal player:
 **Record work → Rewind → Try it differently → Continue → Compare Original**.

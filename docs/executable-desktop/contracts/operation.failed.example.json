@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "operation_id": "66666666-6666-4666-8666-666666666666",
+  "kind": "fork_restore",
+  "state": "failed",
+  "revision": 4,
+  "recording_id": "22222222-2222-4222-8222-222222222222",
+  "session_id": "77777777-7777-4777-8777-777777777777",
+  "branch": "whatif-77777777-7777-4777-8777-777777777777",
+  "phase": "checking_artifacts",
+  "cancel_requested": false,
+  "result": null,
+  "error": {"code": "checkpoint_artifact_missing", "message": "This saved moment could not be restored: its root disk is missing.", "retryable": false}
+}

@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:melange:design:checkpoint:1.0",
+  "title": "Proposed executable desktop checkpoint v1.0",
+  "description": "Design contract, not runtime authority. Semantic validation and backend qualification are mandatory.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "checkpoint_id", "recording_id", "source_session_id", "anchor", "backend", "barrier", "artifacts", "machine_state", "disks", "resource_bindings", "qualification_digest"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "checkpoint_id": {"type": "string", "format": "uuid"},
+    "recording_id": {"type": "string", "format": "uuid"},
+    "source_session_id": {"type": "string", "format": "uuid"},
+    "anchor": {"$ref": "#/$defs/anchor"},
+    "backend": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "build_digest", "profile_id", "profile_digest", "architecture", "machine_type", "checkpoint_format"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "build_digest": {"$ref": "#/$defs/digest"},
+        "profile_id": {"type": "string", "minLength": 1},
+        "profile_digest": {"$ref": "#/$defs/digest"},
+        "architecture": {"type": "string", "minLength": 1},
+        "machine_type": {"type": "string", "minLength": 1},
+        "checkpoint_format": {"type": "string", "minLength": 1}
+      }
+    },
+    "barrier": {
+      "type": "object", "additionalProperties": false,
+      "required": ["input_cursor", "io_cursor", "journal_prefix_digest", "ancestry_prefix_digest", "inventory_digest", "paused", "unresolved_inputs", "unresolved_io", "io_mode", "filesystem_state"],
+      "properties": {
+        "input_cursor": {"type": "integer", "minimum": 0},
+        "io_cursor": {"const": 0},
+        "journal_prefix_digest": {"$ref": "#/$defs/digest"},
+        "ancestry_prefix_digest": {"$ref": "#/$defs/digest"},
+        "inventory_digest": {"$ref": "#/$defs/digest"},
+        "paused": {"const": true},
+        "unresolved_inputs": {"const": 0},
+        "unresolved_io": {"const": 0},
+        "io_mode": {"const": "offline"},
+        "filesystem_state": {"enum": ["not_frozen", "frozen"]}
+      }
+    },
+    "artifacts": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "ciphertext_bytes", "protection"],
+        "properties": {
+          "id": {"$ref": "#/$defs/digest"},
+          "ciphertext_bytes": {"type": "integer", "minimum": 1},
+          "protection": {
+            "type": "object", "additionalProperties": false,
+            "required": ["format", "key_id"],
+            "properties": {
+              "format": {"const": "chunked-aead-v1"},
+              "key_id": {"type": "string", "format": "uuid"}
+            }
+          }
+        }
+      }
+    },
+    "machine_state": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cpu_ram_artifact", "device_state_artifact", "configuration_artifact"],
+      "properties": {
+        "cpu_ram_artifact": {"$ref": "#/$defs/digest"},
+        "device_state_artifact": {"$ref": "#/$defs/digest"},
+        "configuration_artifact": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "disks": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["node_id", "role", "writable", "virtual_bytes", "snapshot_artifact", "backing_artifacts"],
+        "properties": {
+          "node_id": {"type": "string", "minLength": 1},
+          "role": {"type": "string", "minLength": 1},
+          "writable": {"type": "boolean"},
+          "virtual_bytes": {"type": "integer", "minimum": 1},
+          "snapshot_artifact": {"$ref": "#/$defs/digest"},
+          "backing_artifacts": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/digest"}}
+        }
+      }
+    },
+    "resource_bindings": {
+      "description": "Logical resource names only. Host paths are allocated by the trusted supervisor.",
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["name", "kind", "isolation"],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[a-zA-Z0-9_-]+$"},
+          "kind": {"enum": ["disk", "control", "display", "helper"]},
+          "isolation": {"const": "private"}
+        }
+      }
+    },
+    "qualification_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "anchor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["branch", "event_id", "event_hash"],
+      "properties": {
+        "branch": {"type": "string", "minLength": 1},
+        "event_id": {"type": "integer", "minimum": 1},
+        "event_hash": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}
